@@ -136,7 +136,7 @@ class TaskTrackerBot:
         if tasks['morning']:
             msg += "☀️ <b>УТРЕННИЕ:</b>\n"
             for idx, task in enumerate(tasks['morning']):
-                emoji = '☑' if idx in completed.get('morning', []) else '☐'
+                emoji = '✔️' if idx in completed.get('morning', []) else '☐'
                 msg += f"{emoji} {task}\n"
                 total_tasks += 1
                 if idx in completed.get('morning', []):
@@ -146,7 +146,7 @@ class TaskTrackerBot:
         if tasks['day']:
             msg += "🌤️ <b>ДНЕВНЫЕ:</b>\n"
             for idx, task in enumerate(tasks['day']):
-                emoji = '☑' if idx in completed.get('day', []) else '☐'
+                emoji = '✔️' if idx in completed.get('day', []) else '☐'
                 msg += f"{emoji} {task}\n"
                 total_tasks += 1
                 if idx in completed.get('day', []):
@@ -156,7 +156,7 @@ class TaskTrackerBot:
         if tasks['evening']:
             msg += "🌙 <b>ВЕЧЕРНИЕ:</b>\n"
             for idx, task in enumerate(tasks['evening']):
-                emoji = '☑' if idx in completed.get('evening', []) else '☐'
+                emoji = '✔️' if idx in completed.get('evening', []) else '☐'
                 msg += f"{emoji} {task}\n"
                 total_tasks += 1
                 if idx in completed.get('evening', []):
@@ -184,9 +184,9 @@ class TaskTrackerBot:
                 continue
             
             # Убираем старые галочки из задач
-            if line.startswith('•') and '☑' in line:
+            if line.startswith('•') and '✔️' in line:
                 # Удаляем все галочки и восстанавливаем оригинал
-                cleaned = line.replace('☑ ', '').replace(' ☑', '')
+                cleaned = line.replace('✔️ ', '').replace(' ✔️', '')
                 # Убираем лишние пробелы
                 parts = cleaned.split('•', 1)
                 if len(parts) == 2:
@@ -275,7 +275,7 @@ class TaskTrackerBot:
                 if is_done:
                     # Добавляем ОДНУ галочку перед задачей
                     task_text = line[1:].strip()  # Убираем •
-                    updated_lines.append(f"• ☑ {task_text}")
+                    updated_lines.append(f"• ✔️ {task_text}")
                 else:
                     updated_lines.append(line)
                 
@@ -726,10 +726,11 @@ class TaskTrackerBot:
                 state['completed']
             )
             
-            # Создаём кнопку "Обновить прогресс"
+            # Создаём клавиатуру с ОБЕИМИ кнопками
             keyboard = {
                 'inline_keyboard': [
-                    [{'text': '🔄 Обновить прогресс', 'callback_data': 'update_progress'}]
+                    [{'text': '🔄 Обновить прогресс', 'callback_data': 'update_progress'}],
+                    [{'text': '🙏 Утренняя молитва', 'url': 'https://brkme.github.io/My_Day/prayer.html'}]
                 ]
             }
             
@@ -752,10 +753,11 @@ class TaskTrackerBot:
         if message_id in self.message_state:
             original_text = self.message_state[message_id]['original_text']
             
-            # Создаём кнопку "Обновить прогресс"
+            # Создаём клавиатуру с ОБЕИМИ кнопками
             keyboard = {
                 'inline_keyboard': [
-                    [{'text': '🔄 Обновить прогресс', 'callback_data': 'update_progress'}]
+                    [{'text': '🔄 Обновить прогресс', 'callback_data': 'update_progress'}],
+                    [{'text': '🙏 Утренняя молитва', 'url': 'https://brkme.github.io/My_Day/prayer.html'}]
                 ]
             }
             
