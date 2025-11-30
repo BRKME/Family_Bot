@@ -18,6 +18,9 @@ class PersonalScheduleNotifier:
         # Ссылка на молитву на GitHub Pages
         self.prayer_url = "https://brkme.github.io/My_Day/prayer.html"
         
+        # Ссылка на семейный совет на GitHub Pages
+        self.ss_url = "https://brkme.github.io/My_Day/ss.html"
+        
         self.wisdoms = [
     # Действие и начало дела
     "Лучший способ начать — перестать говорить и начать делать. — Уолт Дисней",
@@ -369,22 +372,6 @@ class PersonalScheduleNotifier:
         content += f"\n🎯 <b>Твоя миссия набрать вечером {target_score} баллов!</b>\n🌜 <b>Отличный день! Завершай дела и отдыхай!</b>\n💡 <i>Мудрость дня:</i>\n<b>{wisdom}</b>"
         return content
 
-    async def fetch_family_council_content(self):
-        try:
-            url = "https://raw.githubusercontent.com/BRKME/Day/main/SS.txt"
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, timeout=10) as response:
-                    if response.status == 200:
-                        content = await response.text()
-                        logger.info("✅ Файл SS.txt загружен")
-                        return content
-                    else:
-                        logger.error(f"❌ Ошибка загрузки SS.txt")
-                        return None
-        except Exception as e:
-            logger.error(f"❌ Ошибка: {e}")
-            return None
-
     async def fetch_event_file(self, filename):
         try:
             url = f"https://raw.githubusercontent.com/BRKME/Day/main/{filename}"
@@ -442,8 +429,8 @@ class PersonalScheduleNotifier:
                         logger.error(f"❌ Ошибка API")
                         return False
             if ss_content:
-                family_msg = f"<b>📋 Семейный совет:</b>\n\n{ss_content}"
-                payload_council = {'chat_id': self.chat_id, 'text': family_msg, 'parse_mode': 'HTML'}
+                family_msg = f"<b>📋 Семейный совет:</b>\n\n🔗 <a href='{self.ss_url}'>Открыть структуру Семейного Совета</a>"
+                payload_council = {'chat_id': self.chat_id, 'text': family_msg, 'parse_mode': 'HTML', 'disable_web_page_preview': False}
                 async with aiohttp.ClientSession() as session:
                     async with session.post(url, json=payload_council, timeout=10) as response:
                         if response.status == 200:
@@ -469,7 +456,7 @@ class PersonalScheduleNotifier:
             add_button = True
             
             if day_of_week == 'sunday':
-                ss_content = await self.fetch_family_council_content()
+                ss_content = True  # Флаг для добавления ссылки на семейный совет
             reminders = self.check_recurring_events()
             if reminders:
                 for reminder in reminders:
