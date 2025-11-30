@@ -85,7 +85,7 @@ class TaskTrackerBot:
             keyboard.append([{'text': '☀️ ДНЕВНЫЕ ЗАДАЧИ', 'callback_data': 'header'}])
             for idx, task in enumerate(tasks['day']):
                 is_done = idx in completed.get('day', [])
-                emoji = '⭐' if is_done else '☐'
+                emoji = '⭐' if is_done else '☆'
                 # Обрезаем длинный текст для кнопки
                 short_task = task[:35] + '...' if len(task) > 35 else task
                 keyboard.append([{
@@ -98,7 +98,7 @@ class TaskTrackerBot:
             keyboard.append([{'text': '⛔ НЕЛЬЗЯ ДЕЛАТЬ', 'callback_data': 'header'}])
             for idx, task in enumerate(tasks['cant_do']):
                 is_done = idx in completed.get('cant_do', [])
-                emoji = '⭐' if is_done else '☐'
+                emoji = '⭐' if is_done else '☆'
                 short_task = task[:32] + '...' if len(task) > 32 else task
                 keyboard.append([{
                     'text': f'{emoji} {idx+1}. НЕ {short_task}',
@@ -110,7 +110,7 @@ class TaskTrackerBot:
             keyboard.append([{'text': '🌙 ВЕЧЕРНИЕ ЗАДАЧИ', 'callback_data': 'header'}])
             for idx, task in enumerate(tasks['evening']):
                 is_done = idx in completed.get('evening', [])
-                emoji = '⭐' if is_done else '☐'
+                emoji = '⭐' if is_done else '☆'
                 short_task = task[:35] + '...' if len(task) > 35 else task
                 keyboard.append([{
                     'text': f'{emoji} {idx+1}. {short_task}',
@@ -135,7 +135,7 @@ class TaskTrackerBot:
         if tasks['day']:
             msg += "☀️ <b>ДНЕВНЫЕ:</b>\n"
             for idx, task in enumerate(tasks['day']):
-                emoji = '⭐' if idx in completed.get('day', []) else '☐'
+                emoji = '⭐' if idx in completed.get('day', []) else '☆'
                 msg += f"{emoji} {task}\n"
                 total_tasks += 1
                 if idx in completed.get('day', []):
@@ -145,7 +145,7 @@ class TaskTrackerBot:
         if tasks['cant_do']:
             msg += "⛔ <b>НЕЛЬЗЯ ДЕЛАТЬ:</b>\n"
             for idx, task in enumerate(tasks['cant_do']):
-                emoji = '⭐' if idx in completed.get('cant_do', []) else '☐'
+                emoji = '⭐' if idx in completed.get('cant_do', []) else '☆'
                 msg += f"{emoji} НЕ {task}\n"
                 total_tasks += 1
                 if idx in completed.get('cant_do', []):
@@ -155,7 +155,7 @@ class TaskTrackerBot:
         if tasks['evening']:
             msg += "🌙 <b>ВЕЧЕРНИЕ:</b>\n"
             for idx, task in enumerate(tasks['evening']):
-                emoji = '⭐' if idx in completed.get('evening', []) else '☐'
+                emoji = '⭐' if idx in completed.get('evening', []) else '☆'
                 msg += f"{emoji} {task}\n"
                 total_tasks += 1
                 if idx in completed.get('evening', []):
