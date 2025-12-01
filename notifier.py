@@ -14,18 +14,19 @@ import os
 
 class PersonalScheduleNotifier:
 def __init__(self):
+        # Берём токен и ID чата ТОЛЬКО из переменных окружения
         self.telegram_token = os.getenv('TELEGRAM_TOKEN')
         if not self.telegram_token:
-            raise ValueError("❌ TELEGRAM_TOKEN не найден в переменных окружения!")
+            raise ValueError("TELEGRAM_TOKEN не найден в переменных окружения!")
 
         self.chat_id = os.getenv('TELEGRAM_CHAT_ID')
         if not self.chat_id:
-            raise ValueError("❌ TELEGRAM_CHAT_ID не найден в переменных окружения! Укажи ID канала (например -1001234567890)")
+            raise ValueError("TELEGRAM_CHAT_ID не найден! Укажи ID канала (например -1001234567890)")
 
-        logger.info(f"Notifier запущен | Отправка в чат: {self.chat_id}")
-        
+        logger.info(f"Notifier запущен | Отправка в: {self.chat_id}")
+
         self.prayer_url = "https://brkme.github.io/My_Day/prayer.html"
-        self.ss_url = "https://brkme.github.io/My_Day/ss.html"
+        self.ss_url = "https://brkme.github.io/My_Day/ss.html
         
         self.wisdoms = [
     # Действие и начало дела
