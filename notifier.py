@@ -538,12 +538,11 @@ class PersonalScheduleNotifier:
         return content
     
     def create_progress_button(self):
-        """Создаёт inline кнопку для обновления прогресса"""
-        return {
-            'inline_keyboard': [
-                [{'text': '🔄 Обновить прогресс', 'callback_data': 'update_progress'}]
-            ]
-        }
+    return {
+        'inline_keyboard': [
+            [{'text': 'Обновить прогресс', 'callback_data': 'save_progress'}]  # ← было update_progress
+        ]
+    }
 
     async def format_evening_message(self, date_str, day_of_week, schedule):
         day_names = {'monday': 'Понедельник', 'tuesday': 'Вторник', 'wednesday': 'Среда', 'thursday': 'Четверг', 'friday': 'Пятница', 'saturday': 'Суббота', 'sunday': 'Воскресенье'}
