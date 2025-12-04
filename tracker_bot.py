@@ -21,6 +21,7 @@ import html
 import time
 import hashlib
 import ipaddress
+import random
 from typing import Dict, List, Optional, Any, Tuple, Set
 from collections import OrderedDict
 from asyncio import Lock
@@ -42,7 +43,7 @@ RETRY_BASE_DELAY = 1.0              # Базовая задержка между
 RATE_LIMIT_REQUESTS = 100           # Максимальное количество запросов в окне
 RATE_LIMIT_WINDOW = 60              # Окно rate limiting в секундах
 
-# Telegram IP диапазоны (обновлено 2024)
+# Telegram IP диапазоны (обновлено 2025)
 TELEGRAM_IP_RANGES = [
     ipaddress.ip_network('149.154.160.0/20'),
     ipaddress.ip_network('91.108.4.0/22'),
@@ -58,9 +59,9 @@ TELEGRAM_IP_RANGES = [
 # Регулярные выражения для парсинга
 TASK_PATTERN = re.compile(r'•\s*(.+?)(?:\s*\([^)]+\))?\s*$')
 SECTION_PATTERNS = {
-    'day': re.compile(r'(?:☀️\s*)?(?:Дневные\s+)?задачи?:?\s*(.*?)(?=(?:⛔|🌙|🎯|$))', re.IGNORECASE | re.DOTALL),
-    'cant_do': re.compile(r'(?:⛔\s*)?(?:Нельзя\s+)?делать:?\s*(.*?)(?=(?:🌙|🎯|$))', re.IGNORECASE | re.DOTALL),
-    'evening': re.compile(r'(?:🌙\s*)?(?:Вечерние\s+)?задачи?:?\s*(.*?)(?=(?:🎯|$))', re.IGNORECASE | re.DOTALL),
+    'day': re.compile(r'(☀️\s*(?:Дневные\s+)?задачи|Дневные\s+задачи):?\s*(.*?)(?=(?:⛔|🌙|🎯|$))', re.IGNORECASE | re.DOTALL),
+    'cant_do': re.compile(r'(⛔\s*(?:Нельзя\s+)?делать|Нельзя\s+делать):?\s*(.*?)(?=(?:🌙|🎯|$))', re.IGNORECASE | re.DOTALL),
+    'evening': re.compile(r'(🌙\s*(?:Вечерние\s+)?задачи|Вечерние\s+задачи):?\s*(.*?)(?=(?:🎯|$))', re.IGNORECASE | re.DOTALL),
 }
 
 # Настройка логирования
@@ -202,15 +203,19 @@ class TelegramAPIClient:
                     if attempt == MAX_RETRIES - 1:
                         return None
                     
-                    wait_time = RETRY_BASE_DELAY * (2 ** attempt)
+                    wait_time = RETRY_BASE_DELAY * (2 ** attempt) + random.uniform(0, 0.5)  # Добавлен jitter
                     await asyncio.sleep(wait_time)
                     
-            except (aiohttp.ClientError, asyncio.TimeoutError) as e:
-                logger.warning(f"Network error (attempt {attempt + 1}): {e}")
+            except aiohttp.ClientError as e:
+                logger.warning(f"Client error (attempt {attempt + 1}): {e}")
                 if attempt == MAX_RETRIES - 1:
                     return None
                 await asyncio.sleep(RETRY_BASE_DELAY * (2 ** attempt))
-                
+            except asyncio.TimeoutError as e:
+                logger.warning(f"Timeout error (attempt {attempt + 1}): {e}")
+                if attempt == MAX_RETRIES - 1:
+                    return None
+                await asyncio.sleep(RETRY_BASE_DELAY * (2 ** attempt))
             except Exception as e:
                 logger.error(f"Unexpected error: {e}")
                 return None
@@ -278,9 +283,8 @@ class MessageParser:
     
     @staticmethod
     def sanitize_text(text: str) -> str:
-        """Очищает и экранирует текст"""
-        text = ' '.join(text.split())
-        return html.escape(text)
+        """Очищает и экранирует текст, сохраняя строки"""
+        return '\n'.join(html.escape(line.strip()) for line in text.splitlines() if line.strip())
     
     @staticmethod
     def parse_tasks(message_text: str) -> Dict[str, List[str]]:
@@ -296,7 +300,7 @@ class MessageParser:
         for section, pattern in SECTION_PATTERNS.items():
             match = pattern.search(safe_text)
             if match:
-                section_text = match.group(1).strip()
+                section_text = match.group(2).strip() if len(match.groups()) >= 2 else ''
                 if section_text:
                     for line in section_text.split('\n'):
                         line = line.strip()
@@ -306,6 +310,8 @@ class MessageParser:
                                 task_text = task_match.group(1).strip()
                                 if task_text:
                                     tasks[section].append(task_text)
+                else:
+                    logger.info(f"No content found for section {section}")
         
         logger.info(f"Parsed tasks - Day: {len(tasks['day'])}, Can't do: {len(tasks['cant_do'])}, Evening: {len(tasks['evening'])}")
         return tasks
@@ -413,8 +419,9 @@ class TaskTrackerBot:
         
         # Если данные слишком длинные, используем хэш
         if len(callback_data.encode('utf-8')) > MAX_CALLBACK_DATA_BYTES:
+            logger.warning(f"Callback data too long: {callback_data}, hashing")
             hash_part = hashlib.md5(callback_data.encode()).hexdigest()[:8]
-            callback_data = f"t_{hash_part}_{idx}"
+            callback_data = f"{action}_{section}_{hash_part}_{idx}"  # Сохраняем action и section для парсинга
         
         return callback_data
     
@@ -474,7 +481,8 @@ class TaskTrackerBot:
                 
                 for idx, task in enumerate(tasks[section_key]):
                     emoji = '✅' if idx in completed.get(section_key, set()) else '⬜'
-                    message_lines.append(f"{emoji} {task}")
+                    display_task = self.message_parser.truncate_task(task)
+                    message_lines.append(f"{emoji} {display_task}")
                     
                     total_tasks += 1
                     if idx in completed.get(section_key, set()):
@@ -588,10 +596,16 @@ class TaskTrackerBot:
         """Обрабатывает переключение состояния задачи"""
         try:
             parts = callback_data.split('_')
-            if len(parts) != 3:
+            if len(parts) < 3:
                 raise ValueError(f"Invalid callback data format: {callback_data}")
             
-            _, section_code, idx_str = parts
+            action = parts[0]
+            section_code = parts[1]
+            if len(parts) > 3 and parts[2].isalnum() and len(parts[2]) == 8:  # Хэшированный формат: toggle_section_hash_idx
+                idx_str = parts[3]
+            else:
+                idx_str = parts[2]
+            
             task_idx = int(idx_str)
             
             section_map = {'day': 'day', 'cant': 'cant_do', 'eve': 'evening'}
@@ -634,12 +648,20 @@ class TaskTrackerBot:
                     reply_markup=updated_keyboard
                 )
             
-        except (ValueError, IndexError) as e:
-            logger.error(f"Error parsing callback data: {e}")
+        except ValueError as e:
+            logger.error(f"Value error in toggle task: {e}")
             async with TelegramAPIClient(self.telegram_token, self.chat_id) as client:
                 await client.answer_callback_query(
                     callback_query_id,
                     text="Ошибка обработки. Попробуйте ещё раз.",
+                    show_alert=True
+                )
+        except Exception as e:
+            logger.error(f"Unexpected error in toggle task: {e}")
+            async with TelegramAPIClient(self.telegram_token, self.chat_id) as client:
+                await client.answer_callback_query(
+                    callback_query_id,
+                    text="Произошла ошибка.",
                     show_alert=True
                 )
     
@@ -701,16 +723,19 @@ class TaskTrackerBot:
     async def handle_webhook_request(self, request: web.Request) -> web.Response:
         """Обрабатывает входящие webhook запросы"""
         try:
-            # Проверяем IP адрес
-            peername = request.transport.get_extra_info('peername')
-            if peername:
-                client_ip, _ = peername
-                if not self._validate_ip_address(client_ip):
-                    logger.warning(f"Blocked request from unauthorized IP: {client_ip}")
-                    return web.Response(text='Unauthorized', status=403)
+            # Получаем реальный IP клиента (учитывая прокси)
+            x_forwarded_for = request.headers.get('X-Forwarded-For')
+            if x_forwarded_for:
+                client_ip = x_forwarded_for.split(',')[0].strip()
+            else:
+                client_ip = request.remote
+            
+            if not self._validate_ip_address(client_ip):
+                logger.warning(f"Blocked request from unauthorized IP: {client_ip}")
+                return web.Response(text='Unauthorized', status=403)
             
             # Rate limiting
-            rate_key = f"webhook_{datetime.now().strftime('%H:%M')}"
+            rate_key = f"webhook_{client_ip}"  # Улучшено: per IP
             if not await self.rate_limiter.is_allowed(rate_key):
                 logger.warning("Rate limit exceeded for webhook")
                 return web.Response(text='Too Many Requests', status=429)
