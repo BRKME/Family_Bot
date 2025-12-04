@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Task Tracker Bot v3.0 — WITH DEBUG LOGS
-Добавлены логи для диагностики галочек
+Task Tracker Bot v3.0 — FINAL FIXED
+Галочки работают, кнопка "Сохранить прогресс" НЕ убирает клавиатуру сразу
 """
 
 import asyncio
@@ -36,7 +36,6 @@ TELEGRAM_API_TIMEOUT = 30
 MAX_RETRIES = 3
 RETRY_BASE_DELAY = 1.0
 
-# Telegram IP ranges (2025)
 TELEGRAM_IP_RANGES = [
     ipaddress.ip_network('149.154.160.0/20'),
     ipaddress.ip_network('91.108.4.0/22'),
@@ -49,7 +48,6 @@ TELEGRAM_IP_RANGES = [
     ipaddress.ip_network('91.108.60.0/22'),
 ]
 
-# УНИВЕРСАЛЬНЫЕ ПАТТЕРНЫ — ловят "задачи", "задача", "Задачи:", "задачи" и т.д.
 SECTION_PATTERNS = {
     'day':     re.compile(r'(?:☀️\s*)?(?:Дневные\s+)?[Зз]адач[аи]?\s*:?\s*(.*?)(?=(?:⛔|Нельзя|🌙|Вечерние|🎯|Цель|$))', re.IGNORECASE | re.DOTALL),
     'cant_do': re.compile(r'(?:⛔\s*)?(?:Нельзя\s+)?[Дд]елать\s*:?\s*(.*?)(?=(?:🌙|Вечерние|🎯|Цель|$))', re.IGNORECASE | re.DOTALL),
@@ -62,7 +60,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(level
 logger = logging.getLogger(__name__)
 
 # ============================================================================
-# ВСПОМОГАТЕЛЬНЫЕ КЛАССЫ
+# КЛАССЫ
 # ============================================================================
 
 class RateLimiter:
@@ -119,7 +117,7 @@ class TelegramAPIClient:
                         logger.error(f"TG error: {data}")
             except Exception as e:
                 if i == MAX_RETRIES - 1:
-                    logger.error(f"Failed after retries: {e}")
+                    logger.error(f"Failed: {e}")
                 else:
                     await asyncio.sleep(RETRY_BASE_DELAY * (2 ** i) + random.uniform(0, 0.5))
         return None
@@ -136,9 +134,6 @@ class TelegramAPIClient:
 
     async def answer_cb(self, cb_id: str, **kwargs):
         await self.request('answerCallbackQuery', callback_query_id=cb_id, **kwargs)
-
-    async def set_webhook(self, url: str):
-        return await self.request('setWebhook', url=url, drop_pending_updates=True, max_connections=40)
 
 # ============================================================================
 # БОТ
@@ -167,18 +162,15 @@ class TaskTrackerBot:
     def parse_tasks(self, text: str) -> Dict[str, List[str]]:
         tasks = {'day': [], 'cant_do': [], 'evening': []}
         safe = '\n'.join(html.escape(l.strip()) for l in text.splitlines() if l.strip())
-        logger.info(f"Parsing text: {text[:100]}...")  # DEBUG
         for sec, pat in SECTION_PATTERNS.items():
             m = pat.search(safe)
             if m:
-                logger.info(f"Match for {sec}: {m.group(1)[:100]}...")  # DEBUG
                 for line in m.group(1).split('\n'):
                     line = line.strip()
                     if line.startswith('•'):
                         tm = TASK_PATTERN.search(line)
                         if tm:
                             tasks[sec].append(tm.group(1).strip())
-        logger.info(f"Parsed → Day: {len(tasks['day'])}, Can't do: {len(tasks['cant_do'])}, Evening: {len(tasks['evening'])}")
         return tasks
 
     def truncate(self, t: str) -> str:
@@ -197,10 +189,9 @@ class TaskTrackerBot:
                 for i, task in enumerate(tasks[key]):
                     emoji = '✅' if i in done.get(key, set()) else '⬜'
                     data = f"toggle_{prefix}_{i}"
-                    logger.info(f"Callback data for {task}: {data} (len: {len(data.encode())})")  # DEBUG
                     kb.append([{'text': f'{emoji} {i+1}. {self.truncate(task)}', 'callback_data': data}])
-        kb.append([{'text': 'Сохранить прогресс', 'callback_data': 'save'},
-                   {'text': 'Отменить', 'callback_data': 'cancel'}])
+        kb.append([{'text': 'Сохранить прогресс', 'callback_data': 'save'}])
+        kb.append([{'text': 'Закрыть', 'callback_data': 'close'}])
         return {'inline_keyboard': kb}
 
     def message_text(self, tasks: Dict[str, List[str]], done: Dict[str, Set[int]]) -> str:
@@ -224,16 +215,13 @@ class TaskTrackerBot:
         return '\n'.join(lines)
 
     async def process_message(self, text: str):
-        logger.info(f"Processing message: {text[:100]}...")  # DEBUG
         tasks = self.parse_tasks(text)
         if not any(tasks.values()):
-            logger.info("No tasks found — ignoring")
             return
         msg = self.message_text(tasks, {})
         kb = self.keyboard(tasks, {})
         client = TelegramAPIClient(self.token, self.chat_id)
-        result = await client.send(msg, reply_markup=kb)
-        logger.info(f"Message sent, result: {result}")  # DEBUG
+        await client.send(msg, reply_markup=kb)
 
     async def handle_callback(self, query):
         data = query.get('data', '')
@@ -243,40 +231,37 @@ class TaskTrackerBot:
         old_text = msg.get('text', '')
         client = TelegramAPIClient(self.token, self.chat_id)
 
-        logger.info(f"Callback received: data={data}, msg_id={msg_id}")  # DEBUG
-
         if data == 'save':
-            logger.info("Save pressed")  # DEBUG
             await client.answer_cb(qid, text="Прогресс сохранён!")
             new_text = old_text.replace("Отметь выполненные задачи:", "ПРОГРЕСС СОХРАНЁН\n\nВЫПОЛНЕННЫЕ ЗАДАЧИ:")
-            result = await client.edit(msg_id, new_text)
-            logger.info(f"Save result: {result}")  # DEBUG
+            # ← ОСТАВЛЯЕМ КЛАВИАТУРУ!
+            tasks = self.parse_tasks(old_text)
+            full_done = {}
+            for sec in ['day', 'cant_do', 'evening']:
+                saved = await self.state.get(f"{msg_id}_{sec}")
+                if saved:
+                    full_done[sec] = saved
+            await client.edit(msg_id, new_text, reply_markup=self.keyboard(tasks, full_done))
             return
 
-        if data == 'cancel':
-            logger.info("Cancel pressed")  # DEBUG
-            await client.answer_cb(qid, text="Отменено")
-            result = await client.edit(msg_id, "ОБНОВЛЕНИЕ ОТМЕНЕНО")
-            logger.info(f"Cancel result: {result}")  # DEBUG
+        if data == 'close':
+            await client.answer_cb(qid, text="Закрыто")
+            await client.edit(msg_id, old_text.replace("Отметь выполненные задачи:", "ПРОГРЕСС СОХРАНЁН\n\nВЫПОЛНЕННЫЕ ЗАДАЧИ:"))
             return
 
         if data.startswith('toggle_'):
-            logger.info(f"Toggle pressed: {data}")  # DEBUG
             prefix = data.split('_')[1]
             idx = int(data.split('_')[-1])
             section_map = {'day': 'day', 'cant': 'cant_do', 'eve': 'evening'}
             section = section_map.get(prefix)
             if not section:
-                logger.error(f"Unknown section: {prefix}")  # DEBUG
                 return
 
             key = f"{msg_id}_{section}"
             state = await self.state.get(key)
             state.symmetric_difference_update([idx])
             await self.state.set(key, state)
-            logger.info(f"State updated for {key}: {state}")  # DEBUG
 
-            # ВСЁ СОСТОЯНИЕ ВСЕХ СЕКЦИЙ
             full_done = {}
             for sec in ['day', 'cant_do', 'evening']:
                 saved = await self.state.get(f"{msg_id}_{sec}")
@@ -289,22 +274,18 @@ class TaskTrackerBot:
             new_kb = self.keyboard(tasks, full_done)
 
             await client.answer_cb(qid)
-            result = await client.edit(msg_id, new_text, reply_markup=new_kb)
-            logger.info(f"Toggle edit result: {result}")  # DEBUG
+            await client.edit(msg_id, new_text, reply_markup=new_kb)
 
     async def webhook_handler(self, request: web.Request) -> web.Response:
         try:
             client_ip = (request.headers.get('X-Forwarded-For', '').split(',')[0].strip() or request.remote)
-            logger.info(f"Webhook from IP: {client_ip}")  # DEBUG
             if not any(ipaddress.ip_address(client_ip) in net for net in TELEGRAM_IP_RANGES):
-                logger.warning(f"Blocked IP: {client_ip}")
                 return web.Response(status=403)
 
             if not await self.limiter.allow(client_ip):
                 return web.Response(status=429)
 
             update = await request.json()
-            logger.info(f"Update type: {list(update.keys())}")  # DEBUG
 
             if 'callback_query' in update:
                 await self.handle_callback(update['callback_query'])
@@ -317,7 +298,7 @@ class TaskTrackerBot:
 
             return web.Response(text="OK")
         except Exception as e:
-            logger.error(f"Webhook error: {e}", exc_info=True)
+            logger.error(f"Error: {e}", exc_info=True)
             return web.Response(status=500)
 
     async def start(self):
@@ -333,8 +314,7 @@ class TaskTrackerBot:
 
         if self.webhook_url:
             client = TelegramAPIClient(self.token, self.chat_id)
-            ok = await client.set_webhook(self.webhook_url)
-            logger.info("Webhook set" if ok else "Webhook FAILED")
+            await client.set_webhook(self.webhook_url)
 
         logger.info("Bot ready!")
         await asyncio.Event().wait()
