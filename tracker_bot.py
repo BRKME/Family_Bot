@@ -798,14 +798,22 @@ class TaskTrackerBot:
         try:
             update = await request.json()
             
-            # Обрабатываем обычное сообщение
-            if 'message' in update:
-                message = update['message']
+            # Обрабатываем обычное сообщение или channel_post
+            message = update.get('message') or update.get('channel_post')
+            
+            if message:
                 chat_id = str(message.get('chat', {}).get('id', ''))
+                chat_title = message.get('chat', {}).get('title', 'Private')
+                chat_type = message.get('chat', {}).get('type', 'unknown')
+                
+                logger.info(f"📩 Сообщение из чата: ID={chat_id}, Title={chat_title}, Type={chat_type}")
+                logger.info(f"🔑 Ожидаемый chat_id: {self.chat_id}")
                 
                 # Проверяем что это наш чат
                 if chat_id == self.chat_id and 'text' in message:
                     message_text = message['text']
+                    
+                    logger.info(f"✅ Chat ID совпал! Проверяю текст...")
                     
                     # Проверяем что в сообщении есть задачи
                     if any(keyword in message_text for keyword in ['☀️', '⛔', '🌙', 'Дневн', 'Нельзя', 'Вечерн']):
@@ -822,6 +830,10 @@ class TaskTrackerBot:
                         
                         # Отправляем ответ с кнопками
                         await self.send_message(response_text, keyboard)
+                    else:
+                        logger.warning(f"⚠️ Нет ключевых слов в сообщении: {message_text[:50]}...")
+                else:
+                    logger.warning(f"⚠️ Чат не совпадает или нет текста. chat_id={chat_id}, expected={self.chat_id}, has_text={'text' in message}")
             
             # Обрабатываем callback_query
             elif 'callback_query' in update:
@@ -832,11 +844,12 @@ class TaskTrackerBot:
                 message_id = message.get('message_id', 0)
                 message_text = message.get('text', '')
                 
+                logger.info(f"📞 Получен callback: {callback_data}")
                 await self.process_callback(callback_data, callback_query_id, message_id, message_text)
             
             return web.Response(text='OK')
         except Exception as e:
-            logger.error(f"❌ Ошибка webhook: {e}")
+            logger.error(f"❌ Ошибка webhook: {e}", exc_info=True)
             return web.Response(status=500)
     
     async def run(self):
