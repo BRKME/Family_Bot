@@ -517,7 +517,7 @@ class PersonalScheduleNotifier:
             if weekend_forecast:
                 content += weekend_forecast
         
-        content += f"🌅 <b>План на {date_str}</b>\n🗓️ {day_ru}\n\n"
+        content += f"🌅 <b>План на {day_ru} {date_str}</b>\n\n"
         
         if schedule.get('день'):
             content += "<b>☀️ Дневные задачи:</b>\n"
@@ -555,7 +555,7 @@ class PersonalScheduleNotifier:
         weather = await self.get_weather_forecast()
         
         content = weather
-        content += f"🌙 <b>Вечерний план на {date_str}</b>\n🗓️ <b>{day_ru}</b>\n\n"
+        content += f"🌙 <b>Вечерний план на {day_ru} {date_str}</b>\n\n"
         
         if schedule.get('вечер'):
             content += "<b>Вечерние задачи:</b>\n"
