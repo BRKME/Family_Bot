@@ -757,8 +757,9 @@ class TaskTrackerBot:
             
             await self.edit_message(message_id, updated_text, keyboard)
             
-            # Очищаем состояние
-            del self.message_state[message_id]
+            # НЕ очищаем состояние - оно нужно для повторного открытия!
+            # Обновляем original_text на актуальный (с прогресс-барами)
+            self.message_state[message_id]['original_text'] = updated_text
             
             # Логируем (без отправки нового сообщения)
             logger.info(f"💾 Прогресс сохранён: {percentage}%")
@@ -778,8 +779,9 @@ class TaskTrackerBot:
             
             await self.edit_message(message_id, original_text, keyboard)
             
-            # Очищаем состояние
-            del self.message_state[message_id]
+            # При отмене - очищаем состояние
+            if message_id in self.message_state:
+                del self.message_state[message_id]
     
     async def get_updates(self):
         """Получает обновления от Telegram (long polling)"""
