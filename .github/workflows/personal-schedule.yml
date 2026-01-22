@@ -26,4 +26,4 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           echo "🚀 Запуск семейного бота (утреннее сообщение)"
-          python family_bot.py
+          python notifier.py
