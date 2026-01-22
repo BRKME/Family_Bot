@@ -196,25 +196,29 @@ class FamilyScheduleBot:
 
     def get_today_schedule(self):
         now = datetime.now()
-        date_str = now.strftime("%d.%m.%Y")
+        # Формируем дату в формате "22 Января"
+        months = {
+            1: 'Января', 2: 'Февраля', 3: 'Марта', 4: 'Апреля',
+            5: 'Мая', 6: 'Июня', 7: 'Июля', 8: 'Августа',
+            9: 'Сентября', 10: 'Октября', 11: 'Ноября', 12: 'Декабря'
+        }
+        day = now.day
+        month_name = months[now.month]
+        date_str = f"{day} {month_name}"
         day_of_week = now.strftime("%A").lower()
         return date_str, day_of_week
 
     async def get_weather_forecast(self):
-        """Получает прогноз погоды для Санкт-Петербурга"""
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.get(
-                    "https://wttr.in/Saint-Petersburg?format=%t+%C+%w+%h+%p&m&lang=ru", 
-                    timeout=10
-                ) as response:
+                async with session.get("https://wttr.in/Saint-Petersburg?format=%t+%C+%w+%h+%p&m&lang=ru", timeout=10) as response:
                     if response.status == 200:
                         weather_data = await response.text()
                         parts = weather_data.strip().split()
                         if len(parts) >= 5:
                             temp, condition, wind, humidity, precipitation = parts[:5]
                             return (
-                                f"🌤️ <b>Погода в Санкт-Петербурге:</b>\n"
+                                f"🌤️ <b>Погода:</b>\n"
                                 f"🌡️ Температура: {temp}\n"
                                 f"☁️ Состояние: {condition}\n"
                                 f"💨 Ветер: {wind}\n"
@@ -370,13 +374,12 @@ class FamilyScheduleBot:
         day_ru = day_names.get(day_of_week, day_of_week)
         wisdom = self.get_random_wisdom()
         
-        content = f"🌅 <b>Доброе утро! {day_ru}, {date_str}</b>\n\n"
+        content = f"🌅 <b>Доброе Утро ! Сегодня «{day_ru}» {date_str}</b>\n\n"
         
-        # Добавляем погоду
         weather = await self.get_weather_forecast()
-        content += weather + "\n"
+        content += weather
         
-        content += f"💭 {wisdom}\n\n"
+        content += f"\n💭 {wisdom}\n\n"
         
         # Добавляем расписание детей
         kids_schedule_text = self.get_kids_schedule(day_of_week)
