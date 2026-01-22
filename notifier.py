@@ -429,7 +429,8 @@ class FamilyScheduleBot:
             async with aiohttp.ClientSession() as session:
                 async with session.post(url, json=payload, timeout=10) as response:
                     if response.status != 200:
-                        logger.error(f"❌ Ошибка API")
+                        error_text = await response.text()
+                        logger.error(f"❌ Ошибка API {response.status}: {error_text}")
                         return False
             
             # Если воскресенье - отправляем ссылку на семейный совет
@@ -447,7 +448,8 @@ class FamilyScheduleBot:
                             logger.info("✅ Сообщения отправлены!")
                             return True
                         else:
-                            logger.error(f"❌ Ошибка отправки семейного совета")
+                            error_text = await response.text()
+                            logger.error(f"❌ Ошибка отправки семейного совета {response.status}: {error_text}")
                             return False
             else:
                 logger.info("✅ Сообщение отправлено!")
