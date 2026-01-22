@@ -209,27 +209,42 @@ class FamilyScheduleBot:
         return date_str, day_of_week
 
     async def get_weather_forecast(self):
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get("https://wttr.in/Saint-Petersburg?format=%t+%C+%w+%h+%p&m&lang=ru", timeout=10) as response:
-                    if response.status == 200:
-                        weather_data = await response.text()
-                        parts = weather_data.strip().split()
-                        if len(parts) >= 5:
-                            temp, condition, wind, humidity, precipitation = parts[:5]
-                            return (
-                                f"🌤️ <b>Погода:</b>\n"
-                                f"🌡️ Температура: {temp}\n"
-                                f"☁️ Состояние: {condition}\n"
-                                f"💨 Ветер: {wind}\n"
-                                f"💧 Влажность: {humidity}\n"
-                                f"🌧️ Осадки: {precipitation}\n"
-                            )
-                        return "🌤️ <b>Погода:</b> Данные недоступны\n"
-                    return "🌤️ <b>Погода:</b> Ошибка получения\n"
-        except Exception as e:
-            logger.error(f"❌ Ошибка погоды: {e}")
-            return "🌤️ <b>Погода:</b> Ошибка подключения\n"
+        """Тестируем разные варианты названия Санкт-Петербурга"""
+        city_variants = [
+            'Sankt-Peterburg',
+            'Saint-Petersburg',
+            'St.Petersburg',
+            'StPetersburg',
+            'Санкт-Петербург',
+            'SPb',
+            'Leningrad'
+        ]
+        
+        for city in city_variants:
+            try:
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(f"https://wttr.in/{city}?format=%t+%C+%w+%h+%p&m&lang=ru", timeout=10) as response:
+                        if response.status == 200:
+                            weather_data = await response.text()
+                            parts = weather_data.strip().split()
+                            if len(parts) >= 5:
+                                temp, condition, wind, humidity, precipitation = parts[:5]
+                                logger.info(f"✅ Погода получена для города: {city}")
+                                return (
+                                    f"🌤️ <b>Погода ({city}):</b>\n"
+                                    f"🌡️ Температура: {temp}\n"
+                                    f"☁️ Состояние: {condition}\n"
+                                    f"💨 Ветер: {wind}\n"
+                                    f"💧 Влажность: {humidity}\n"
+                                    f"🌧️ Осадки: {precipitation}\n"
+                                )
+            except Exception as e:
+                logger.warning(f"⚠️ Вариант '{city}' не сработал: {e}")
+                continue
+        
+        # Если ни один вариант не сработал
+        logger.error(f"❌ Все варианты названия города не сработали")
+        return "🌤️ <b>Погода:</b> Ошибка подключения\n"
 
     def get_last_day_of_month(self, year, month, target_weekday):
         """Получает последний день месяца для заданного дня недели"""
