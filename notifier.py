@@ -209,34 +209,24 @@ class FamilyScheduleBot:
         return date_str, day_of_week
 
     async def get_weather_forecast(self):
-        """Получает погоду для Санкт-Петербурга"""
         try:
             async with aiohttp.ClientSession() as session:
-                # Используем более простой формат: только температура и состояние
-                async with session.get(
-                    "https://wttr.in/Saint-Petersburg?format=%t+%C&m&lang=ru", 
-                    timeout=10
-                ) as response:
+                async with session.get("https://wttr.in/Saint-Petersburg?format=%t+%C+%w+%h+%p&m&lang=ru", timeout=10) as response:
                     if response.status == 200:
                         weather_data = await response.text()
-                        weather_data = weather_data.strip()
-                        logger.info(f"✅ Погода получена: {weather_data}")
-                        
-                        # Разделяем только на температуру и состояние
-                        parts = weather_data.split(None, 1)  # Разделить максимум на 2 части
-                        if len(parts) >= 2:
-                            temp = parts[0]
-                            condition = parts[1]
+                        parts = weather_data.strip().split()
+                        if len(parts) >= 5:
+                            temp, condition, wind, humidity, precipitation = parts[:5]
                             return (
-                                f"🌤️ <b>Погода в Санкт-Петербурге:</b>\n"
-                                f"🌡️ {temp} • {condition}\n"
+                                f"🌤️ <b>Погода:</b>\n"
+                                f"🌡️ Температура: {temp}\n"
+                                f"☁️ Состояние: {condition}\n"
+                                f"💨 Ветер: {wind}\n"
+                                f"💧 Влажность: {humidity}\n"
+                                f"🌧️ Осадки: {precipitation}\n"
                             )
-                        elif len(parts) == 1:
-                            return f"🌤️ <b>Погода:</b> {parts[0]}\n"
-                        
                         return "🌤️ <b>Погода:</b> Данные недоступны\n"
                     return "🌤️ <b>Погода:</b> Ошибка получения\n"
-            
         except Exception as e:
             logger.error(f"❌ Ошибка погоды: {e}")
             return "🌤️ <b>Погода:</b> Ошибка подключения\n"
@@ -389,7 +379,9 @@ class FamilyScheduleBot:
         weather = await self.get_weather_forecast()
         content += weather
         
-        content += f"\n💭 {wisdom}\n\n"
+        content += "\n"
+        
+        content += f"💭 {wisdom}\n\n"
         
         # Добавляем расписание детей
         kids_schedule_text = self.get_kids_schedule(day_of_week)
