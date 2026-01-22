@@ -209,42 +209,37 @@ class FamilyScheduleBot:
         return date_str, day_of_week
 
     async def get_weather_forecast(self):
-        """Тестируем разные варианты названия Санкт-Петербурга"""
-        city_variants = [
-            'Sankt-Peterburg',
-            'Saint-Petersburg',
-            'St.Petersburg',
-            'StPetersburg',
-            'Санкт-Петербург',
-            'SPb',
-            'Leningrad'
-        ]
-        
-        for city in city_variants:
-            try:
-                async with aiohttp.ClientSession() as session:
-                    async with session.get(f"https://wttr.in/{city}?format=%t+%C+%w+%h+%p&m&lang=ru", timeout=10) as response:
-                        if response.status == 200:
-                            weather_data = await response.text()
-                            parts = weather_data.strip().split()
-                            if len(parts) >= 5:
-                                temp, condition, wind, humidity, precipitation = parts[:5]
-                                logger.info(f"✅ Погода получена для города: {city}")
-                                return (
-                                    f"🌤️ <b>Погода ({city}):</b>\n"
-                                    f"🌡️ Температура: {temp}\n"
-                                    f"☁️ Состояние: {condition}\n"
-                                    f"💨 Ветер: {wind}\n"
-                                    f"💧 Влажность: {humidity}\n"
-                                    f"🌧️ Осадки: {precipitation}\n"
-                                )
-            except Exception as e:
-                logger.warning(f"⚠️ Вариант '{city}' не сработал: {e}")
-                continue
-        
-        # Если ни один вариант не сработал
-        logger.error(f"❌ Все варианты названия города не сработали")
-        return "🌤️ <b>Погода:</b> Ошибка подключения\n"
+        """Получает погоду для Санкт-Петербурга"""
+        try:
+            async with aiohttp.ClientSession() as session:
+                # Используем более простой формат: только температура и состояние
+                async with session.get(
+                    "https://wttr.in/Saint-Petersburg?format=%t+%C&m&lang=ru", 
+                    timeout=10
+                ) as response:
+                    if response.status == 200:
+                        weather_data = await response.text()
+                        weather_data = weather_data.strip()
+                        logger.info(f"✅ Погода получена: {weather_data}")
+                        
+                        # Разделяем только на температуру и состояние
+                        parts = weather_data.split(None, 1)  # Разделить максимум на 2 части
+                        if len(parts) >= 2:
+                            temp = parts[0]
+                            condition = parts[1]
+                            return (
+                                f"🌤️ <b>Погода в Санкт-Петербурге:</b>\n"
+                                f"🌡️ {temp} • {condition}\n"
+                            )
+                        elif len(parts) == 1:
+                            return f"🌤️ <b>Погода:</b> {parts[0]}\n"
+                        
+                        return "🌤️ <b>Погода:</b> Данные недоступны\n"
+                    return "🌤️ <b>Погода:</b> Ошибка получения\n"
+            
+        except Exception as e:
+            logger.error(f"❌ Ошибка погоды: {e}")
+            return "🌤️ <b>Погода:</b> Ошибка подключения\n"
 
     def get_last_day_of_month(self, year, month, target_weekday):
         """Получает последний день месяца для заданного дня недели"""
