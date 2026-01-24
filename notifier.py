@@ -12,7 +12,6 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 class FamilyScheduleBot:
-    # Константы класса
     DAY_NAMES_MAP = {
         'monday': 'понедельник',
         'tuesday': 'вторник', 
@@ -128,7 +127,6 @@ class FamilyScheduleBot:
             "Пусть каждый момент сегодня будет ценен"
         ]
         
-        # Семейные традиции
         self.recurring_events = {
             'tarelka': {
                 'name': 'Семейная традиция - Путешествие на тарелке', 
@@ -147,9 +145,7 @@ class FamilyScheduleBot:
             }
         }
         
-        # Дни рождения и памятные даты (формат: {'имя': (день, месяц)})
         self.birthdays = {
-            # Январь
             'дедушка Коля (день памяти)': (1, 1),
             'Илюша Бензионович': (3, 1),
             'Света Пяткова': (8, 1),
@@ -158,25 +154,21 @@ class FamilyScheduleBot:
             'прабабушка Зоя': (14, 1),
             'Витя': (23, 1),
             'Сережа Добровенко (крестный Марты)': (25, 1),
-            # Февраль
             'Годовщина Ксюши и Вити': (4, 2),
             'Мама': (14, 2),
             'Милана Зборовская': (26, 2),
-            # Март
             'Макар Ельцов': (4, 3),
             'Марина Зборовская': (7, 3),
             'Катя (сестра папы)': (18, 3),
             'Юра Добровенко': (28, 3),
             'тетя Галя': (31, 3),
             'Годовщина Кати и Олега': (31, 3),
-            # Апрель
             'дедушка Эдик (день памяти)': (1, 4),
             'бабушка Галя': (2, 4),
             'Варя': (6, 4),
             'Годовщина Ени и Ромы': (8, 4),
             'Саша': (9, 4),
             'Ярик Артеменко': (22, 4),
-            # Май
             'Зак': (1, 5),
             'Слава (брат папы)': (6, 5),
             'прабабушка Зоя (день памяти)': (7, 5),
@@ -187,7 +179,6 @@ class FamilyScheduleBot:
             'Годовщина свадьбы (ЗАГС)': (21, 5),
             'бабушка Таня': (22, 5),
             'Женя (сестра папы)': (27, 5),
-            # Июнь
             'Разманыч': (3, 6),
             'дядя Рома': (7, 6),
             'Яна': (10, 6),
@@ -198,35 +189,29 @@ class FamilyScheduleBot:
             'Оля Пяткова': (22, 6),
             'Годовщина свадьбы Иры и Жени': (24, 6),
             'Кирюша': (29, 6),
-            # Июль
             'Таня Пяткова': (2, 7),
             'Вова Разведченко': (27, 7),
             'Кирилл Бензионович': (28, 7),
             'Женя Артеменко': (30, 7),
-            # Август
             'дедушка Эдик': (1, 8),
             'Мироша Бензионович': (3, 8),
             'Мартюся': (10, 8),
             'Оля Зеновская': (10, 8),
             'Надя': (11, 8),
             'Юля': (20, 8),
-            # Сентябрь
             'Годовщина свадьбы Оли Пятковой': (7, 9),
             'бабушка Света': (14, 9),
-            # Октябрь
             'Даня': (2, 10),
             'Годовщина свадьбы Гали и Сережи': (4, 10),
             'Галя Добровенко (крестная Аркаши)': (6, 10),
             'Малюсик': (15, 10),
             'Савва Зеновский': (30, 10),
-            # Ноябрь
             'Лева': (15, 11),
             'Ваня': (18, 11),
             'Рома Зборовский': (19, 11),
             'Олег': (21, 11),
             'Сережа Зайцев': (25, 11),
             'Костя (брат папы)': (26, 11),
-            # Декабрь
             'Джонни': (2, 12),
             'Папа': (4, 12),
             'Галя (сестра папы)': (6, 12),
@@ -237,7 +222,6 @@ class FamilyScheduleBot:
             'Дима Ельцов': (25, 12),
         }
         
-        # Расписание занятий детей
         self.kids_schedule = {
             'понедельник': [
                 {'child': '👧 Марта', 'activity': '🇬🇧 Английский', 'time': '16:00-17:00'},
@@ -270,7 +254,6 @@ class FamilyScheduleBot:
             ]
         }
         
-        # Кто моет посуду
         self.dishes_schedule = {
             'понедельник': '👧 Марта моет посуду',
             'вторник': '👦 Аркаша моет посуду',
@@ -286,7 +269,6 @@ class FamilyScheduleBot:
 
     def get_today_schedule(self):
         now = datetime.now()
-        # Формируем дату в формате "22 Января"
         months = {
             1: 'Января', 2: 'Февраля', 3: 'Марта', 4: 'Апреля',
             5: 'Мая', 6: 'Июня', 7: 'Июля', 8: 'Августа',
@@ -322,7 +304,6 @@ class FamilyScheduleBot:
             return "🌤️ <b>Погода:</b> Ошибка подключения\n"
 
     def get_last_day_of_month(self, year, month, target_weekday):
-        """Получает последний день месяца для заданного дня недели"""
         calendar = monthcalendar(year, month)
         for week in reversed(calendar):
             day = week[target_weekday]
@@ -331,7 +312,6 @@ class FamilyScheduleBot:
         return None
 
     def get_event_date_by_rule(self, rule, year, month):
-        """Получает дату события по правилу"""
         if rule == 'last_saturday':
             day = self.get_last_day_of_month(year, month, 5)
             return (year, month, day) if day else None
@@ -348,7 +328,6 @@ class FamilyScheduleBot:
         return None
 
     def check_recurring_events(self):
-        """Проверяет семейные традиции и возвращает напоминания"""
         from datetime import date as dt
         today = datetime.now()
         year, month, day = today.year, today.month, today.day
@@ -374,7 +353,6 @@ class FamilyScheduleBot:
         return reminders
 
     def check_upcoming_birthdays(self):
-        """Проверяет дни рождения на завтра"""
         from datetime import timedelta
         today = datetime.now()
         tomorrow = today + timedelta(days=1)
@@ -382,14 +360,12 @@ class FamilyScheduleBot:
         upcoming_birthdays = []
         
         for name, (day, month) in self.birthdays.items():
-            # Проверяем совпадает ли завтрашняя дата с днём рождения
             if tomorrow.day == day and tomorrow.month == month:
                 upcoming_birthdays.append(name)
         
         return upcoming_birthdays
 
     async def fetch_event_file(self, filename):
-        """Загружает содержимое файла с описанием традиции"""
         try:
             url = f"https://raw.githubusercontent.com/BRKME/Day/main/{filename}"
             async with aiohttp.ClientSession() as session:
@@ -406,7 +382,6 @@ class FamilyScheduleBot:
             return None
 
     def get_kids_schedule(self, day_of_week):
-        """Возвращает расписание детей на сегодня"""
         logger.info(f"📅 Запрос расписания детей для дня: {day_of_week}")
         
         if not day_of_week:
@@ -458,7 +433,6 @@ class FamilyScheduleBot:
         return schedule_text
 
     def get_dishes_reminder(self, day_of_week):
-        """Возвращает напоминание кто моет посуду"""
         day_ru = self.DAY_NAMES_MAP.get(day_of_week)
         if not day_ru:
             return None
@@ -466,7 +440,6 @@ class FamilyScheduleBot:
         return self.dishes_schedule.get(day_ru)
 
     async def format_morning_message(self, date_str, day_of_week):
-        """Формирует утреннее сообщение"""
         day_names = {
             'monday': 'Понедельник', 
             'tuesday': 'Вторник', 
@@ -488,21 +461,17 @@ class FamilyScheduleBot:
         
         content += f"💭 {wisdom}\n\n"
         
-        # Добавляем расписание детей
         kids_schedule_text = self.get_kids_schedule(day_of_week)
         if kids_schedule_text:
             content += f"{kids_schedule_text}\n"
         
-        # Добавляем напоминание кто моет посуду
         dishes_reminder = self.get_dishes_reminder(day_of_week)
         if dishes_reminder:
             content += f"<b>🍽️ Посуда:</b>\n• {dishes_reminder}\n\n"
         
-        # Добавляем напоминание про уборку в пятницу
         if day_of_week == 'friday':
             content += "<b>🧹 Сегодня пятница:</b>\n• Зачёт по чистоте комнаты <i>(20 min)</i>\n\n"
         
-        # Проверяем семейные традиции
         reminders = self.check_recurring_events()
         if reminders:
             for reminder in reminders:
@@ -522,7 +491,6 @@ class FamilyScheduleBot:
                     if event_content:
                         content += f"{event_content}\n"
         
-        # Проверяем дни рождения на завтра
         upcoming_birthdays = self.check_upcoming_birthdays()
         if upcoming_birthdays:
             content += "\n🎂 <b>ЗАВТРА ДЕНЬ РОЖДЕНИЯ:</b>\n"
@@ -532,7 +500,6 @@ class FamilyScheduleBot:
         return content
 
     async def send_telegram_message(self, message, send_ss=False):
-        """Отправляет сообщение в Telegram"""
         try:
             url = f"https://api.telegram.org/bot{self.telegram_token}/sendMessage"
             payload = {
@@ -557,7 +524,6 @@ class FamilyScheduleBot:
                         logger.error(f"❌ Telegram API вернул ok=false: {response_data}")
                         return False
             
-            # Если воскресенье - отправляем ссылку на семейный совет
             if send_ss:
                 family_msg = f"<b>📋 Семейный совет:</b>\n\n🔗 <a href='{self.ss_url}'>Открыть структуру Семейного Совета</a>"
                 payload_council = {
@@ -591,11 +557,9 @@ class FamilyScheduleBot:
             return False
 
     async def send_morning_message(self):
-        """Отправляет утреннее сообщение"""
         date_str, day_of_week = self.get_today_schedule()
         message = await self.format_morning_message(date_str, day_of_week)
         
-        # Если воскресенье - отправляем семейный совет
         send_ss = (day_of_week == 'sunday')
         
         return await self.send_telegram_message(message, send_ss=send_ss)
