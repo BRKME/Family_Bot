@@ -545,9 +545,16 @@ class FamilyScheduleBot:
             logger.info("📤 Отправка сообщения в Telegram...")
             async with aiohttp.ClientSession() as session:
                 async with session.post(url, json=payload, timeout=10) as response:
+                    response_data = await response.json()
+                    logger.info(f"📊 Telegram API response: {response_data}")
+                    
                     if response.status != 200:
                         error_text = await response.text()
                         logger.error(f"❌ Ошибка API {response.status}: {error_text}")
+                        return False
+                    
+                    if not response_data.get('ok', False):
+                        logger.error(f"❌ Telegram API вернул ok=false: {response_data}")
                         return False
             
             # Если воскресенье - отправляем ссылку на семейный совет
@@ -561,13 +568,20 @@ class FamilyScheduleBot:
                 }
                 async with aiohttp.ClientSession() as session:
                     async with session.post(url, json=payload_council, timeout=10) as response:
-                        if response.status == 200:
-                            logger.info("✅ Сообщения отправлены!")
-                            return True
-                        else:
+                        response_data = await response.json()
+                        logger.info(f"📊 Telegram API response (семейный совет): {response_data}")
+                        
+                        if response.status != 200:
                             error_text = await response.text()
                             logger.error(f"❌ Ошибка отправки семейного совета {response.status}: {error_text}")
                             return False
+                        
+                        if not response_data.get('ok', False):
+                            logger.error(f"❌ Telegram API вернул ok=false для семейного совета: {response_data}")
+                            return False
+                        
+                        logger.info("✅ Сообщения отправлены!")
+                        return True
             else:
                 logger.info("✅ Сообщение отправлено!")
                 return True
