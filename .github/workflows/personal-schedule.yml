@@ -2,7 +2,7 @@ name: Family Schedule Bot
 
 on:
   schedule:
-    - cron: '*/15 * * * *'  # 04:30 UTC каждый день
+    - cron: '30 4 * * *'  # 04:30 UTC каждый день
   workflow_dispatch:
   push:
     branches: [main]
