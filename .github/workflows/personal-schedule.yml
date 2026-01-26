@@ -1,8 +1,10 @@
 name: Family Schedule Bot
+
 on:
   schedule:
-    - cron: '30 4 * * *'   # 07:30 MSK (UTC+3) — утреннее сообщение
-  workflow_dispatch:       # Возможность ручного запуска
+    - cron: '30 4 * * *'
+  workflow_dispatch:
+
 jobs:
   send-morning-notification:
     runs-on: ubuntu-latest
@@ -20,10 +22,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install aiohttp
       
-      - name: Отправка утреннего сообщения
+      - name: Run bot
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: |
-          echo "🚀 Запуск семейного бота (утреннее сообщение)"
-          python notifier.py
+        run: python notifier.py
