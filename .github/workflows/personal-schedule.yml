@@ -1,0 +1,33 @@
+name: Family Schedule Bot
+on:
+  schedule:
+    - cron: '30 4 * * *'
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  send-morning-notification:
+    runs-on: ubuntu-latest
+    steps:
+      # ВСЕГДА СНАЧАЛА checkout!
+      - name: 📦 Checkout code
+        uses: actions/checkout@v4
+      
+      # ПОТОМ git config
+      - name: ⚙️ Configure Git
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+      
+      # Остальные шаги...
+      - name: 🐍 Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: 🤖 Run bot
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python notifier.py
