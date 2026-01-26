@@ -1,6 +1,5 @@
 name: 🔧 Activate Schedule
 on:
-  # Сначала только ручной запуск и пуш
   workflow_dispatch:
   push:
     branches: [main]
@@ -8,26 +7,80 @@ on:
 jobs:
   activate:
     runs-on: ubuntu-latest
+    
     steps:
-      - name: 🎯 Activate scheduled workflows
-        run: |
-          echo "Activating scheduled workflows..."
-          echo "Current time: $(date)"
-          echo "Repository: ${{ github.repository }}"
-          
-          # Создаем маркер активации
-          mkdir -p .github
-          echo "schedule_activated=true" > .github/schedule_marker
-          echo "activation_date=$(date -u '+%Y-%m-%dT%H:%M:%SZ')" >> .github/schedule_marker
-          
-          echo "✅ Activation file created"
+      # Шаг 1: СНАЧАЛА checkout
+      - name: 📦 Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
       
-      - name: 📤 Commit activation marker
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Шаг 2: ПОТОМ git config
+      - name: ⚙️ Configure Git
         run: |
+          echo "Configuring Git..."
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-          git add .github/schedule_marker
-          git commit -m "⚡ Activate scheduled workflows" || echo "No changes to commit"
-          git push || echo "Nothing to push"
+          git config --global pull.rebase true
+      
+      # Шаг 3: Создание маркера активации
+      - name: 🎯 Create schedule marker
+        run: |
+          echo "Creating activation marker..."
+          mkdir -p .github
+          
+          # Создаем файл-маркер
+          cat > .github/schedule_marker << EOF
+          # SCHEDULE ACTIVATION MARKER
+          activated=true
+          activated_at=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
+          repository=${{ github.repository }}
+          trigger=${{ github.event_name }}
+          run_count=1
+          EOF
+          
+          # Если файл уже существует, увеличиваем счетчик
+          if [ -f .github/schedule_marker ]; then
+            if grep -q "run_count" .github/schedule_marker; then
+              current_count=$(grep "run_count=" .github/schedule_marker | cut -d'=' -f2)
+              new_count=$((current_count + 1))
+              sed -i "s/run_count=$current_count/run_count=$new_count/" .github/schedule_marker
+            fi
+          fi
+          
+          echo "✅ Marker created/updated"
+          cat .github/schedule_marker
+      
+      # Шаг 4: Коммит изменений
+      - name: 📤 Commit activation
+        run: |
+          echo "Committing activation marker..."
+          
+          # Проверяем есть ли изменения
+          if ! git diff --quiet -- .github/schedule_marker 2>/dev/null; then
+            git add .github/schedule_marker
+            git commit -m "🔧 Schedule activation [${{ github.event_name }}] - Run $(grep 'run_count=' .github/schedule_marker | cut -d'=' -f2)"
+            
+            # Pull и push
+            git pull origin main --rebase
+            git push origin main
+            
+            echo "✅ Changes committed and pushed"
+          else
+            echo "⏭️ No changes to commit"
+          fi
+      
+      # Шаг 5: Информация
+      - name: ℹ️ Activation info
+        run: |
+          echo "=========================================="
+          echo "✅ SCHEDULE ACTIVATION COMPLETE"
+          echo "=========================================="
+          echo "🎯 This was run #$(grep 'run_count=' .github/schedule_marker 2>/dev/null | cut -d'=' -f2 || echo '1')"
+          echo "📅 Marker created/updated: $(date)"
+          echo "⏰ Next steps:"
+          echo "   1. Run this workflow 2 more times"
+          echo "   2. Wait 5 minutes between runs"
+          echo "   3. Main workflow will run at 04:30 UTC"
+          echo "=========================================="
