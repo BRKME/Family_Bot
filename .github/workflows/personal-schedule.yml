@@ -2,76 +2,34 @@ name: Family Schedule Bot
 
 on:
   schedule:
-    - cron: '30 4 * * *'  # 04:30 UTC каждый день
+    - cron: '30 4 * * *'
   workflow_dispatch:
-  push:
-    branches: [main]
 
 jobs:
   send-morning-notification:
     runs-on: ubuntu-latest
     
     steps:
-      # Шаг 1: Checkout кода
-      - name: 📦 Checkout code
+      - name: Checkout code
         uses: actions/checkout@v4
       
-      # Шаг 2: Настройка Python с кэшированием
-      - name: 🐍 Set up Python
+      - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
-          cache: 'pip'  # Кэшируем pip пакеты
+          cache: 'pip'
       
-      # Шаг 3: Установка зависимостей из requirements.txt
-      - name: 📚 Install dependencies
+      - name: Install dependencies
         run: |
-          echo "Installing dependencies from requirements.txt..."
           python -m pip install --upgrade pip
-          
-          # Проверяем наличие requirements.txt
           if [ -f "requirements.txt" ]; then
-            echo "📄 Found requirements.txt:"
-            cat requirements.txt
             pip install -r requirements.txt
           else
-            echo "❌ requirements.txt not found!"
-            exit 1
+            pip install aiohttp
           fi
-          
-          # Проверяем установку
-          echo "✅ Installed packages:"
-          pip list | grep -i "aiohttp"
       
-      # Шаг 4: Проверка структуры проекта
-      - name: 🔍 Check project structure
-        run: |
-          echo "📁 Project structure:"
-          echo "Current directory: $(pwd)"
-          echo "Files:"
-          ls -la
-          echo ""
-          echo "requirements.txt content:"
-          cat requirements.txt
-          echo ""
-          echo "notifier.py exists: $([ -f "notifier.py" ] && echo "✅ YES" || echo "❌ NO")"
-      
-      # Шаг 5: Запуск бота
-      - name: 🤖 Run bot
+      - name: Run bot
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: |
-          echo "🚀 Running notifier.py..."
-          python notifier.py
-      
-      # Шаг 6: Логирование результата
-      - name: 📝 Log result
-        if: always()
-        run: |
-          echo "=========================================="
-          echo "🏁 WORKFLOW COMPLETED: ${{ job.status }}"
-          echo "🕐 Finished at: $(date)"
-          echo "🎯 Trigger: ${{ github.event_name }}"
-          echo "📅 Next schedule: 04:30 UTC"
-          echo "=========================================="
+        run: python notifier.py
