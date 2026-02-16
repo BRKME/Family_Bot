@@ -580,10 +580,25 @@ class FamilyScheduleBot:
         
         return await self.send_telegram_message(message, send_ss=send_ss)
 
+    async def send_gratitude_reminder(self):
+        return await self.send_telegram_message("🌷Самое время получить семейную благодарность")
+
+    async def send_games_reminder(self):
+        return await self.send_telegram_message("🏠Самое время поиграть в семейные игры и повеселиться")
+
 async def main():
     logger.info(f"🚀 Запуск семейного бота")
     bot = FamilyScheduleBot()
-    success = await bot.send_morning_message()
+    
+    mode = sys.argv[1] if len(sys.argv) > 1 else 'morning'
+    
+    if mode == 'gratitude':
+        success = await bot.send_gratitude_reminder()
+    elif mode == 'games':
+        success = await bot.send_games_reminder()
+    else:
+        success = await bot.send_morning_message()
+    
     if success:
         logger.info("🎉 Успешно завершено!")
     else:
