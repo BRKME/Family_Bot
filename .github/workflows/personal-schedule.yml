@@ -2,7 +2,7 @@ name: Family Schedule Bot
 
 on:
   schedule:
-    - cron: '30 4 * * *'   # Утро 7:30 MSK
+    - cron: '30 3 * * *'   # Утро 7:30 MSK
     - cron: '0 17 * * *'   # Вечер 20:00 MSK - благодарность
     - cron: '0 16 * * 5'   # Пятница 19:00 MSK - игры
   workflow_dispatch:
