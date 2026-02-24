@@ -435,10 +435,9 @@ class FamilyScheduleBot:
         
         content += f"💭 {wisdom}\n\n"
         
-        # Занятия детей убраны из утреннего уведомления
-        # kids_schedule_text = self.get_kids_schedule(day_of_week)
-        # if kids_schedule_text:
-        #     content += f"{kids_schedule_text}\n"
+        kids_schedule_text = self.get_kids_schedule(day_of_week)
+        if kids_schedule_text:
+            content += f"{kids_schedule_text}\n"
         
         dishes_reminder = self.get_dishes_reminder(day_of_week)
         if dishes_reminder:
