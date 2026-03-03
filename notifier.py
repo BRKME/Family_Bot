@@ -425,9 +425,6 @@ class FamilyScheduleBot:
         if dishes_reminder:
             content += f"<b>🍽️ Посуда:</b>\n• {dishes_reminder}\n\n"
         
-        if day_of_week == 'friday':
-            content += "<b>🧹 Сегодня пятница:</b>\n• Зачёт по чистоте комнаты <i>(20 min)</i>\n\n"
-        
         reminders = self.check_recurring_events()
         if reminders:
             for reminder in reminders:
