@@ -22,6 +22,23 @@ class FamilyScheduleBot:
         'sunday': 'воскресенье'
     }
     
+    # Ежедневные напоминания (случайное одно в день 15:00-20:00 МСК)
+    FAMILY_REMINDERS = [
+        "Напоминаю, - Грязную одежду сразу в 🧺стирку. (👩⚡Мама контроль)",
+        "Напоминаю, - 👔Чистая одежда на 🧷вешалку или свернуть (👩⚡Мама контроль)",
+        "Напоминаю, -🍽️ Объедки еды сразу в мусор, а не на пол. (👩⚡Мама контроль)",
+        "Напоминаю, - 📱Аркаша сдает телефон в 21 (👩⚡Мама контроль)",
+        "Напоминаю, - Все любят 🐈 Лилусю (👩⚡Папа контроль)",
+        "Напоминаю, - 👞 Обувь ставим на полку, а не посреди коридора. (👩⚡ Мама контроль)",
+        "Напоминаю, - 💡 Гасить свет, выходя из комнаты. (👩⚡ Мама контроль)",
+        "Напоминаю, - 📚 Сделал уроки - убери учебники на место. (👩⚡ Мама контроль)",
+        "Напоминаю, - 🎒 Рюкзак собираем с вечера. (👩⚡ Мама контроль)",
+        "Напоминаю, - 🐈 Покормить Лилусю вовремя. (👩⚡ Папа контроль)",
+        "Напоминаю, - 💧 У Лилуси всегда должна быть свежая вода. (👩⚡ Папа контроль)",
+        "Напоминаю, - 🧹 Убрать за Лилусей лоток. (👩⚡ Папа контроль)",
+        "Напоминаю, - 📵 Не сидеть в телефоне за едой. (👩⚡ Мама контроль)",
+    ]
+    
     def __init__(self):
         self.telegram_token = os.getenv('TELEGRAM_TOKEN', '')
         if not self.telegram_token:
@@ -260,6 +277,39 @@ class FamilyScheduleBot:
             logger.error(f"❌ Ошибка погоды: {e}")
             return ""
 
+    async def get_currency_rates(self):
+        """Получаем курс USD/RUB и BTC/USD"""
+        result = ""
+        
+        try:
+            # USD/RUB from CBR API
+            async with aiohttp.ClientSession() as session:
+                # Курс ЦБ РФ
+                cbr_url = "https://www.cbr-xml-daily.ru/daily_json.js"
+                async with session.get(cbr_url, timeout=10) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        usd = data.get('Valute', {}).get('USD', {})
+                        usd_rate = usd.get('Value', 0)
+                        if usd_rate:
+                            result += f"💵 USD/RUB: {usd_rate:.2f} ₽\n"
+                            logger.info(f"✅ Курс USD: {usd_rate:.2f}")
+                
+                # BTC/USD from CoinGecko
+                btc_url = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd"
+                async with session.get(btc_url, timeout=10) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        btc_price = data.get('bitcoin', {}).get('usd', 0)
+                        if btc_price:
+                            result += f"₿ BTC/USD: ${btc_price:,.0f}\n"
+                            logger.info(f"✅ Курс BTC: ${btc_price:,.0f}")
+                            
+        except Exception as e:
+            logger.error(f"❌ Ошибка получения курсов: {e}")
+        
+        return result
+
     def get_last_day_of_month(self, year, month, target_weekday):
         calendar = monthcalendar(year, month)
         for week in reversed(calendar):
@@ -413,9 +463,14 @@ class FamilyScheduleBot:
         
         weather = await self.get_weather_forecast()
         if weather:
-            content += weather + "\n"
+            content += weather
         
-        content += f"💭 {wisdom}\n\n"
+        # Добавляем курсы валют после погоды
+        currency = await self.get_currency_rates()
+        if currency:
+            content += currency
+        
+        content += f"\n💭 {wisdom}\n\n"
         
         kids_schedule_text = self.get_kids_schedule(day_of_week)
         if kids_schedule_text:
@@ -523,6 +578,19 @@ class FamilyScheduleBot:
     async def send_games_reminder(self):
         return await self.send_telegram_message("🏠Самое время поиграть в семейные игры и повеселиться")
 
+    async def send_cleaning_reminder(self):
+        """Воскресенье 10:00 МСК - Большая уборка"""
+        return await self.send_telegram_message("Всем привет сегодня 🧹Большая Уборка!")
+
+    async def send_cleaning_tomorrow(self):
+        """Суббота 18:00 МСК - напоминание про уборку завтра"""
+        return await self.send_telegram_message("Ребята завтра утром 🧹Большая Уборка!")
+
+    async def send_random_reminder(self):
+        """Ежедневно 15:00-20:00 МСК - случайное напоминание из списка"""
+        reminder = random.choice(self.FAMILY_REMINDERS)
+        return await self.send_telegram_message(reminder)
+
 async def main():
     logger.info(f"🚀 Запуск семейного бота")
     bot = FamilyScheduleBot()
@@ -533,6 +601,12 @@ async def main():
         success = await bot.send_gratitude_reminder()
     elif mode == 'games':
         success = await bot.send_games_reminder()
+    elif mode == 'cleaning':
+        success = await bot.send_cleaning_reminder()
+    elif mode == 'cleaning_tomorrow':
+        success = await bot.send_cleaning_tomorrow()
+    elif mode == 'random_reminder':
+        success = await bot.send_random_reminder()
     else:
         success = await bot.send_morning_message()
     
