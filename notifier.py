@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import asyncio
 import aiohttp
+import json
 from datetime import datetime
 from calendar import monthcalendar
 import logging
@@ -284,35 +285,49 @@ class FamilyScheduleBot:
         try:
             async with aiohttp.ClientSession() as session:
                 # USD/RUB from CBR API
-                cbr_url = "https://www.cbr-xml-daily.ru/daily_json.js"
-                async with session.get(cbr_url, timeout=10) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        usd = data.get('Valute', {}).get('USD', {})
-                        usd_rate = usd.get('Value', 0)
-                        usd_prev = usd.get('Previous', usd_rate)
-                        if usd_rate:
-                            usd_diff = usd_rate - usd_prev
-                            usd_arrow = "↑" if usd_diff > 0 else "↓" if usd_diff < 0 else "→"
-                            result += f"💵 USD: {usd_rate:.2f}₽ {usd_arrow}\n"
-                            logger.info(f"✅ USD: {usd_rate:.2f} {usd_arrow}")
+                try:
+                    cbr_url = "https://www.cbr-xml-daily.ru/daily_json.js"
+                    async with session.get(cbr_url, timeout=10) as response:
+                        if response.status == 200:
+                            text = await response.text()
+                            data = json.loads(text)
+                            usd = data.get('Valute', {}).get('USD', {})
+                            usd_rate = usd.get('Value', 0)
+                            usd_prev = usd.get('Previous', usd_rate)
+                            if usd_rate:
+                                usd_diff = usd_rate - usd_prev
+                                usd_arrow = "↑" if usd_diff > 0 else "↓" if usd_diff < 0 else "→"
+                                result += f"💵 USD: {usd_rate:.2f}₽ {usd_arrow}\n"
+                                logger.info(f"✅ USD: {usd_rate:.2f} {usd_arrow}")
+                        else:
+                            logger.warning(f"CBR API status: {response.status}")
+                except Exception as e:
+                    logger.error(f"❌ USD error: {e}")
                 
                 # BTC/USD from CoinGecko with 24h change
-                btc_url = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd&include_24hr_change=true"
-                async with session.get(btc_url, timeout=10) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        btc = data.get('bitcoin', {})
-                        btc_price = btc.get('usd', 0)
-                        btc_change = btc.get('usd_24h_change', 0)
-                        if btc_price:
-                            btc_arrow = "↑" if btc_change > 0 else "↓" if btc_change < 0 else "→"
-                            btc_formatted = f"{btc_price:,.0f}".replace(",", " ")
-                            result += f"₿ BTC: ${btc_formatted} {btc_arrow}{abs(btc_change):.1f}%\n"
-                            logger.info(f"✅ BTC: ${btc_formatted} {btc_arrow}{abs(btc_change):.1f}%")
+                try:
+                    btc_url = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd&include_24hr_change=true"
+                    async with session.get(btc_url, timeout=10) as response:
+                        if response.status == 200:
+                            data = await response.json()
+                            btc = data.get('bitcoin', {})
+                            btc_price = btc.get('usd', 0)
+                            btc_change = btc.get('usd_24h_change', 0)
+                            if btc_price:
+                                btc_arrow = "↑" if btc_change > 0 else "↓" if btc_change < 0 else "→"
+                                btc_formatted = f"{btc_price:,.0f}".replace(",", " ")
+                                result += f"₿ BTC: ${btc_formatted} {btc_arrow}{abs(btc_change):.1f}%\n"
+                                logger.info(f"✅ BTC: ${btc_formatted} {btc_arrow}{abs(btc_change):.1f}%")
+                        else:
+                            logger.warning(f"CoinGecko API status: {response.status}")
+                except Exception as e:
+                    logger.error(f"❌ BTC error: {e}")
                             
         except Exception as e:
             logger.error(f"❌ Ошибка курсов: {e}")
+        
+        if result:
+            result = "\n" + result  # Add newline before currency block
         
         return result
 
