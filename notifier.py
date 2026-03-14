@@ -50,6 +50,8 @@ class FamilyScheduleBot:
             raise ValueError("❌ TELEGRAM_CHAT_ID не найден в переменных окружения!")
         
         self.ss_url = "https://brkme.github.io/My_Day_Shedule/ss.html"
+        self.new_url = "https://brkme.github.io/My_Day_Shedule/new.html"
+        self.chronos_url = "https://brkme.github.io/My_Day_Shedule/chronos.html"
         
         self.wisdoms = [
             # Про семью и детей
@@ -92,13 +94,15 @@ class FamilyScheduleBot:
                 'rule': 'last_saturday'
             },
             'chronos': {
-                'name': 'Семейная традиция - Вечер воспоминаний. Хранители времени', 
-                'file': 'chronos.txt', 
+                'name': 'Семейная традиция - Вечер воспоминаний', 
+                'url': self.chronos_url,
+                'short_text': 'Хранители времени — смотрим фото и рассказываем историю семьи',
                 'rule': 'third_saturday'
             },
             'new': {
                 'name': 'Семейная традиция - День нового', 
-                'file': 'new.txt', 
+                'url': self.new_url,
+                'short_text': 'Выходим из зоны комфорта всей семьей!',
                 'rule': 'second_saturday'
             }
         }
@@ -501,24 +505,44 @@ class FamilyScheduleBot:
         if dishes_reminder:
             content += f"<b>🍽️ Посуда:</b>\n• {dishes_reminder}\n\n"
         
+        # Напоминание про телефон
+        content += "<b>📱 Телефон:</b>\n• 👀 Аркаша сдает телефон в 20:00\n\n"
+        
         reminders = self.check_recurring_events()
         if reminders:
             for reminder in reminders:
                 event = reminder['event']
-                event_content = await self.fetch_event_file(event['file'])
                 
-                if reminder['type'] == 'week_before':
-                    content += f"\n🔔 <b>НАПОМИНАНИЕ (За 7 дней):</b>\n<b>{event['name']}</b>\n"
-                    if event_content:
-                        content += f"{event_content}\n"
-                elif reminder['type'] == 'three_days_before':
-                    content += f"\n🔔 <b>НАПОМИНАНИЕ (За 3 дня):</b>\n<b>{event['name']}</b>\n"
-                    if event_content:
-                        content += f"{event_content}\n"
-                elif reminder['type'] == 'event_day':
-                    content += f"\n🎉 <b>СЕГОДНЯ:</b>\n<b>{event['name']}</b>\n"
-                    if event_content:
-                        content += f"{event_content}\n"
+                # Если есть URL - используем короткий текст со ссылкой
+                if 'url' in event:
+                    if reminder['type'] == 'week_before':
+                        content += f"\n🔔 <b>НАПОМИНАНИЕ (За 7 дней):</b>\n<b>{event['name']}</b>\n"
+                        content += f"{event.get('short_text', '')}\n"
+                        content += f"🔗 <a href='{event['url']}'>Подробнее</a>\n"
+                    elif reminder['type'] == 'three_days_before':
+                        content += f"\n🔔 <b>НАПОМИНАНИЕ (За 3 дня):</b>\n<b>{event['name']}</b>\n"
+                        content += f"{event.get('short_text', '')}\n"
+                        content += f"🔗 <a href='{event['url']}'>Подробнее</a>\n"
+                    elif reminder['type'] == 'event_day':
+                        content += f"\n🎉 <b>СЕГОДНЯ:</b>\n<b>{event['name']}</b>\n"
+                        content += f"{event.get('short_text', '')}\n"
+                        content += f"🔗 <a href='{event['url']}'>Подробнее</a>\n"
+                else:
+                    # Старая логика для событий с файлом
+                    event_content = await self.fetch_event_file(event['file'])
+                    
+                    if reminder['type'] == 'week_before':
+                        content += f"\n🔔 <b>НАПОМИНАНИЕ (За 7 дней):</b>\n<b>{event['name']}</b>\n"
+                        if event_content:
+                            content += f"{event_content}\n"
+                    elif reminder['type'] == 'three_days_before':
+                        content += f"\n🔔 <b>НАПОМИНАНИЕ (За 3 дня):</b>\n<b>{event['name']}</b>\n"
+                        if event_content:
+                            content += f"{event_content}\n"
+                    elif reminder['type'] == 'event_day':
+                        content += f"\n🎉 <b>СЕГОДНЯ:</b>\n<b>{event['name']}</b>\n"
+                        if event_content:
+                            content += f"{event_content}\n"
         
         upcoming_birthdays = self.check_upcoming_birthdays()
         if upcoming_birthdays:
