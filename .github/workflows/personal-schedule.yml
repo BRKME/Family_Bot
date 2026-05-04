@@ -142,7 +142,7 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python notifier.py cleaning_tomorrow
 
-  send-random-reminder:
+  send-this-day-in-history:
     runs-on: ubuntu-latest
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -165,4 +165,5 @@ jobs:
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: python notifier.py random_reminder
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: python notifier.py this_day

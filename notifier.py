@@ -23,23 +23,6 @@ class FamilyScheduleBot:
         'sunday': 'воскресенье'
     }
     
-    # Ежедневные напоминания (случайное одно в день 15:00-20:00 МСК)
-    FAMILY_REMINDERS = [
-        "Напоминаю, - Грязную одежду сразу в 🧺стирку. (👩⚡Мама контроль)",
-        "Напоминаю, - 👔Чистая одежда на 🧷вешалку или свернуть (👩⚡Мама контроль)",
-        "Напоминаю, -🍽️ Объедки еды сразу в мусор, а не на пол. (👩⚡Мама контроль)",
-        "Напоминаю, - 📱Аркаша сдает телефон в 21 (👩⚡Мама контроль)",
-        "Напоминаю, - Все любят 🐈 Лилусю (👩⚡Папа контроль)",
-        "Напоминаю, - 👞 Обувь ставим на полку, а не посреди коридора. (👩⚡ Мама контроль)",
-        "Напоминаю, - 💡 Гасить свет, выходя из комнаты. (👩⚡ Мама контроль)",
-        "Напоминаю, - 📚 Сделал уроки - убери учебники на место. (👩⚡ Мама контроль)",
-        "Напоминаю, - 🎒 Рюкзак собираем с вечера. (👩⚡ Мама контроль)",
-        "Напоминаю, - 🐈 Покормить Лилусю вовремя. (👩⚡ Папа контроль)",
-        "Напоминаю, - 💧 У Лилуси всегда должна быть свежая вода. (👩⚡ Папа контроль)",
-        "Напоминаю, - 🧹 Убрать за Лилусей лоток. (👩⚡ Папа контроль)",
-        "Напоминаю, - 📵 Не сидеть в телефоне за едой. (👩⚡ Мама контроль)",
-    ]
-    
     def __init__(self):
         self.telegram_token = os.getenv('TELEGRAM_TOKEN', '')
         if not self.telegram_token:
@@ -665,10 +648,68 @@ class FamilyScheduleBot:
         """Суббота 18:00 МСК - напоминание про уборку завтра"""
         return await self.send_telegram_message("Ребята завтра утром 🧹Большая Уборка!")
 
-    async def send_random_reminder(self):
-        """Ежедневно 15:00-20:00 МСК - случайное напоминание из списка"""
-        reminder = random.choice(self.FAMILY_REMINDERS)
-        return await self.send_telegram_message(reminder)
+    async def send_this_day_in_history(self):
+        """Ежедневно - интересный/забавный факт 'Этот день в истории' через AI"""
+        try:
+            openai_key = os.getenv('OPENAI_API_KEY')
+            if not openai_key:
+                logger.error("❌ OPENAI_API_KEY не найден")
+                return False
+            
+            today = datetime.now()
+            day = today.day
+            month_names = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
+                          'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря']
+            month = month_names[today.month - 1]
+            
+            prompt = f"""Расскажи один интересный, забавный или удивительный исторический факт о том, что произошло {day} {month} в любой год в истории.
+
+Требования:
+- Факт должен быть реальным и проверяемым
+- Предпочтительны забавные, необычные или удивительные события
+- Можно про изобретения, открытия, рекорды, курьёзы
+- Формат: короткий факт (2-3 предложения)
+- В конце укажи год события
+
+Напиши только сам факт, без вступлений."""
+
+            headers = {
+                "Authorization": f"Bearer {openai_key}",
+                "Content-Type": "application/json"
+            }
+            
+            payload = {
+                "model": "gpt-4o-mini",
+                "messages": [{"role": "user", "content": prompt}],
+                "max_tokens": 300,
+                "temperature": 0.9
+            }
+            
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    "https://api.openai.com/v1/chat/completions",
+                    headers=headers,
+                    json=payload,
+                    timeout=30
+                ) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        fact = data['choices'][0]['message']['content'].strip()
+                        
+                        message = f"📅 <b>Этот день в истории</b>\n"
+                        message += f"<i>{day} {month}</i>\n\n"
+                        message += fact
+                        
+                        logger.info(f"✅ AI факт получен: {fact[:50]}...")
+                        return await self.send_telegram_message(message)
+                    else:
+                        error_text = await response.text()
+                        logger.error(f"❌ OpenAI ошибка: {response.status} - {error_text[:100]}")
+                        return False
+                        
+        except Exception as e:
+            logger.error(f"❌ Ошибка получения факта: {e}")
+            return False
 
 async def main():
     logger.info(f"🚀 Запуск семейного бота")
@@ -684,8 +725,8 @@ async def main():
         success = await bot.send_cleaning_reminder()
     elif mode == 'cleaning_tomorrow':
         success = await bot.send_cleaning_tomorrow()
-    elif mode == 'random_reminder':
-        success = await bot.send_random_reminder()
+    elif mode == 'this_day':
+        success = await bot.send_this_day_in_history()
     else:
         success = await bot.send_morning_message()
     
