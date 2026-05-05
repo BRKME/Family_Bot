@@ -34,7 +34,7 @@ class FamilyScheduleBot:
         
         self.ss_url = "https://brkme.github.io/My_Day_Shedule/ss.html"
         self.new_url = "https://brkme.github.io/My_Day_Shedule/new.html"
-        self.chronos_url = "https://brkme.github.io/My_Day_Shedule/chronos.html"
+        # АРХИВ: self.chronos_url = "https://brkme.github.io/My_Day_Shedule/chronos.html"
         
         self.wisdoms = [
             # Про семью и детей
@@ -110,12 +110,13 @@ class FamilyScheduleBot:
                 'file': 'tarelka.txt', 
                 'rule': 'last_saturday'
             },
-            'chronos': {
-                'name': 'Семейная традиция - Вечер воспоминаний', 
-                'url': self.chronos_url,
-                'short_text': 'Хранители времени — смотрим фото и рассказываем историю семьи',
-                'rule': 'third_saturday'
-            },
+            # АРХИВ: 'chronos' - Вечер воспоминаний (убрана из активных традиций)
+            # 'chronos': {
+            #     'name': 'Семейная традиция - Вечер воспоминаний', 
+            #     'url': self.chronos_url,
+            #     'short_text': 'Хранители времени — смотрим фото и рассказываем историю семьи',
+            #     'rule': 'third_saturday'
+            # },
             'new': {
                 'name': 'Семейная традиция - День нового', 
                 'url': self.new_url,
