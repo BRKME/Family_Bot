@@ -248,7 +248,27 @@ class FamilyScheduleBot:
         }
 
     def get_random_wisdom(self):
-        return random.choice(self.wisdoms)
+        """Цитата дня из quotes.json — детерминированная ротация (04.07.2026).
+
+        Прежний random.choice по ~60 захардкоженным строкам давал случайные
+        повторы уже в пределах пары недель. Теперь: корпус в quotes.json,
+        порядок перемешивается сидом года (каждый год — новая последователь-
+        ность), выбор — по дню года. Повтор невозможен, пока не исчерпан весь
+        корпус (~100+ дней), state-файлов и коммитов не требуется. Подпись
+        автора выводится только если она есть в корпусе (политика: атрибуция
+        только проверяемая, сомнительное — без подписи)."""
+        try:
+            base = os.path.dirname(os.path.abspath(__file__))
+            with open(os.path.join(base, "quotes.json"), encoding="utf-8") as f:
+                quotes = json.load(f)["quotes"]
+            now = datetime.now()
+            order = list(range(len(quotes)))
+            random.Random(now.year).shuffle(order)
+            q = quotes[order[now.timetuple().tm_yday % len(quotes)]]
+            return f"{q['text']} — {q['author']}" if q.get("author") else q["text"]
+        except Exception as e:
+            logger.warning(f"quotes.json недоступен ({e}) — fallback на встроенный список")
+            return random.choice(self.wisdoms)
 
     def get_today_schedule(self):
         now = datetime.now()
