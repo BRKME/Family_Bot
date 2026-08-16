@@ -10,6 +10,8 @@ Telegram бот для отслеживания выполнения задач 
 
 import asyncio
 import aiohttp
+
+from traditions import TraditionLog
 from aiohttp import web
 import json
 import logging
@@ -638,6 +640,21 @@ class TaskTrackerBot:
         """Обрабатывает callback от кнопок"""
         logger.info(f"📞 Получен callback: {callback_data}")
         
+        if callback_data.startswith('trad_'):
+            # Традиции: «Было», «Не было», «Вернуть из архива».
+            # Пишем в traditions.json — со статистикой дня это не связано.
+            action, key = callback_data[5:].split('_', 1)
+            today = datetime.now().strftime("%Y-%m-%d")
+            if action == 'restore':
+                self.trad_log.restore(key)
+                note = "Вернул ↩️"
+            else:
+                self.trad_log.record(key, today,
+                                     'done' if action == 'done' else 'skip')
+                note = "Отметил ✅" if action == 'done' else "Ок, записал"
+            await self.answer_callback_query(callback_query_id, note)
+            return
+
         if callback_data == 'update_progress':
             # Показываем чек-лист
             await self.show_checklist(message_id, message_text)

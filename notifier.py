@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 import asyncio
 import aiohttp
+
+from traditions import (TraditionLog, archive_message, digest_line,
+                         event_keyboard, warning_line)
 import json
 from datetime import datetime
 from calendar import monthcalendar
@@ -104,6 +107,10 @@ class FamilyScheduleBot:
             "Материнская любовь — начало всех начал. — Максим Горький"
         ]
         
+        # Живые традиции: отметки и авто-архив (см. traditions.py).
+        # Семейный совет — такая же традиция, у него ключ 'council'.
+        self.trad_log = TraditionLog()
+
         self.recurring_events = {
             'tarelka': {
                 'name': 'Семейная традиция - Путешествие на тарелке', 
@@ -400,13 +407,97 @@ class FamilyScheduleBot:
                 return (year, month, saturdays[1])
         return None
 
+    async def announce_archived(self, keys):
+        """Сообщить о заархивированных традициях — с кнопкой возврата.
+
+        Тихая архивация опаснее ошибочной: через полгода не вспомнить,
+        что вообще было в списке.
+        """
+        names = self.tradition_names()
+        for key in keys:
+            if not self.trad_log.is_archived(key):
+                continue
+            msg, kb = archive_message(key, names.get(key, key))
+            await self.send_telegram_message(msg, keyboard=kb)
+
+    def close_past_events(self, today=None):
+        """Закрыть все прошедшие события, на которые не ответили.
+
+        Считается при запуске, а не в день события: у человека есть весь
+        день, чтобы нажать кнопку. Смотрим на месяц назад — этого хватает
+        и месячным традициям, и еженедельному совету.
+
+        Возвращает ключи традиций, которым только что засчитали пропуск.
+        """
+        from datetime import date as _d, timedelta as _td
+        today = _d.fromisoformat(today) if today else datetime.now().date()
+        closed = []
+        for key, event in self.recurring_events.items():
+            if self.trad_log.is_archived(key):
+                continue
+            for back in range(1, 32):
+                day = today - _td(days=back)
+                ed = self.get_event_date_by_rule(event['rule'], day.year, day.month)
+                if ed and _d(*ed) == day:
+                    if self.close_unanswered(key, day.isoformat()):
+                        closed.append(key)
+        # Семейный совет — каждое воскресенье
+        if not self.trad_log.is_archived('council'):
+            for back in range(1, 15):
+                day = today - _td(days=back)
+                if day.weekday() == 6 and self.close_unanswered('council', day.isoformat()):
+                    closed.append('council')
+        return closed
+
+    def close_unanswered(self, key, day):
+        """Закрыть прошедшее событие как пропущенное, если ответа не было.
+
+        Ровно то место, где реализовано «молчание считается пропуском».
+        Уже проставленный ответ не трогаем: нажатие всегда важнее
+        автоматики.
+        """
+        marks = self.trad_log.data.get(key, {}).get('marks', {})
+        if str(day) in marks:
+            return False
+        self.trad_log.record(key, day, 'skip')
+        return True
+
+    def reminder_keyboard(self, reminders):
+        """Кнопки «Было / Не было» — только в день события.
+
+        За неделю и за три дня отмечать нечего: событие ещё не наступило,
+        и кнопка там означала бы обещание, а не факт.
+        """
+        keys = [r['key'] for r in reminders if r.get('type') == 'event_day']
+        if not keys:
+            return None
+        rows = []
+        for k in keys:
+            rows += event_keyboard(k)['inline_keyboard']
+        return {'inline_keyboard': rows}
+
+    def council_keyboard(self):
+        return event_keyboard('council')
+
+    def active_events(self):
+        """Традиции без заархивированных.
+
+        Раньше архивация была ручной — традицию комментировали в коде,
+        и до этого момента она продолжала напоминать о себе."""
+        return self.trad_log.filter_active(self.recurring_events)
+
+    def tradition_names(self):
+        names = {k: v['name'] for k, v in self.recurring_events.items()}
+        names['council'] = 'Семейный совет'
+        return names
+
     def check_recurring_events(self):
         from datetime import date as dt
         today = datetime.now()
         year, month, day = today.year, today.month, today.day
         reminders = []
         
-        for event_key, event in self.recurring_events.items():
+        for event_key, event in self.active_events().items():
             event_date = self.get_event_date_by_rule(event['rule'], year, month)
             if not event_date:
                 continue
@@ -568,6 +659,9 @@ class FamilyScheduleBot:
                         content += f"\n🎉 <b>СЕГОДНЯ:</b>\n<b>{event['name']}</b>\n"
                         content += f"{event.get('short_text', '')}\n"
                         content += f"🔗 <a href='{event['url']}'>Подробнее</a>\n"
+                        _w = warning_line(self.trad_log, reminder['key'])
+                        if _w:
+                            content += f"{_w}\n"
                 else:
                     # Старая логика для событий с файлом
                     event_content = await self.fetch_event_file(event['file'])
@@ -593,7 +687,7 @@ class FamilyScheduleBot:
         
         return content
 
-    async def send_telegram_message(self, message, send_ss=False):
+    async def send_telegram_message(self, message, send_ss=False, keyboard=None):
         try:
             url = f"https://api.telegram.org/bot{self.telegram_token}/sendMessage"
             payload = {
@@ -602,6 +696,8 @@ class FamilyScheduleBot:
                 'parse_mode': 'HTML',
                 'disable_web_page_preview': False
             }
+            if keyboard:
+                payload['reply_markup'] = json.dumps(keyboard)
             
             logger.info("📤 Отправка сообщения в Telegram...")
             async with aiohttp.ClientSession() as session:
@@ -624,7 +720,8 @@ class FamilyScheduleBot:
                     'chat_id': self.chat_id, 
                     'text': family_msg, 
                     'parse_mode': 'HTML', 
-                    'disable_web_page_preview': False
+                    'disable_web_page_preview': False,
+                    'reply_markup': json.dumps(self.council_keyboard())
                 }
                 async with aiohttp.ClientSession() as session:
                     async with session.post(url, json=payload_council, timeout=10) as response:
@@ -654,9 +751,18 @@ class FamilyScheduleBot:
         date_str, day_of_week = self.get_today_schedule()
         message = await self.format_morning_message(date_str, day_of_week)
         
-        send_ss = (day_of_week == 'sunday')
-        
-        return await self.send_telegram_message(message, send_ss=send_ss)
+        send_ss = (day_of_week == 'sunday' and
+                   not self.trad_log.is_archived('council'))
+
+        # Прошедшие события без ответа закрываем как пропущенные — это и
+        # есть «молчание считается пропуском».
+        _closed = self.close_past_events()
+
+        keyboard = self.reminder_keyboard(self.check_recurring_events())
+        result = await self.send_telegram_message(message, send_ss=send_ss,
+                                                  keyboard=keyboard)
+        await self.announce_archived(_closed)
+        return result
 
     async def send_gratitude_reminder(self):
         return await self.send_telegram_message("🌷Самое время получить семейную благодарность")
