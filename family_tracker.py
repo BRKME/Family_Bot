@@ -27,6 +27,15 @@ import aiohttp
 from traditions import (TraditionLog, archive_message, event_keyboard,
                          threshold_for)
 
+
+def _plural_tries(n):
+    """«2 попытки», «5 попыток» — иначе текст спотыкается."""
+    if n % 10 == 1 and n % 100 != 11:
+        return f"{n} попытка"
+    if n % 10 in (2, 3, 4) and n % 100 not in (12, 13, 14):
+        return f"{n} попытки"
+    return f"{n} попыток"
+
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -134,14 +143,15 @@ class FamilyTracker:
         left = threshold_for(key) - misses
         if left == 1:
             return (f"🔔 <b>{name}</b> — последняя попытка.\n"
-                    f"Пропустили {misses} раза подряд. Сделаем в следующий "
-                    f"раз — и всё вернётся на место.")
-        if left == 2:
-            return (f"👀 <b>{name}</b> — пропуск номер {misses}.\n"
-                    f"Ещё две возможности. Традиция никуда не делась, "
-                    f"её просто давно не звали.")
-        return (f"📌 <b>{name}</b> в этот раз не случилась.\n"
-                f"Бывает. Впереди ещё {left} попытки.")
+                    f"Сделаем в следующий раз — и всё вернётся на место.")
+        if misses == 1:
+            # Первый пропуск — не повод для тревоги, даже если по остатку
+            # попыток он уже предпоследний.
+            return (f"📌 В этот раз без традиции: <b>{name}</b>.\n"
+                    f"Бывает. Впереди ещё {_plural_tries(left)}.")
+        return (f"👀 Снова мимо: <b>{name}</b>.\n"
+                f"Осталось {_plural_tries(left)}. Традиция никуда не делась — "
+                f"её просто давно не звали.")
 
     def skip_note(self, key):
         """Текст всплывашки при «Не было».

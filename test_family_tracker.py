@@ -317,3 +317,21 @@ def test_tradition_is_named_not_keyed(tracker):
     tracker.trad_log.record('cleaning', '2026-08-02', 'skip')
     assert 'cleaning' not in tracker.miss_announcement('cleaning')
     assert 'борка' in tracker.miss_announcement('cleaning')
+
+
+def test_wording_works_for_any_gender_of_the_name(tracker):
+    """«Семейный совет не случилась» — название мужского рода, глагол
+    женского. Формулировки не должны зависеть от рода названия."""
+    for key in ('council', 'cleaning', 'games'):
+        tracker.trad_log.record(key, '2026-08-02', 'skip')
+        text = tracker.miss_announcement(key)
+        assert 'не случилась' not in text and 'снова не случилась' not in text
+
+
+def test_first_miss_is_never_alarming(tracker):
+    """При пороге 3 первый пропуск по остатку попыток уже предпоследний,
+    но тревожить на нём рано."""
+    tracker.trad_log.record('council', '2026-08-02', 'skip')
+    text = tracker.miss_announcement('council').lower()
+    assert 'последняя' not in text
+    assert 'бывает' in text
