@@ -417,3 +417,63 @@ def test_misses_counted_after_the_tradition_is_seen(tmp_path, monkeypatch):
     n.trad_log.mark_seen('cleaning', '2026-08-01')
     n.trad_log.record('cleaning', '2026-08-02', 'skip')
     assert n.trad_log.misses_in_row('cleaning') == 1
+
+
+# ── Благодарность: ежедневный ритм, свой порог ───────────────────────────
+
+def test_gratitude_has_buttons(tmp_path, monkeypatch):
+    import asyncio
+    n = _notifier(tmp_path, monkeypatch)
+    sent = []
+
+    async def fake_send(self, message, send_ss=False, keyboard=None):
+        sent.append(keyboard)
+        return True
+
+    monkeypatch.setattr(type(n), 'send_telegram_message', fake_send)
+    asyncio.run(n.send_gratitude_reminder())
+    data = [b['callback_data'] for row in sent[0]['inline_keyboard'] for b in row]
+    assert 'trad_done_gratitude' in data and 'trad_skip_gratitude' in data
+
+
+def test_three_misses_do_not_kill_a_daily_ritual(log):
+    """Три пропуска у месячной традиции — квартал, у ежедневной — три дня.
+    Одна командировка не должна убивать благодарность."""
+    for d in ('2026-08-01', '2026-08-02', '2026-08-03'):
+        log.record('gratitude', d, 'skip')
+    assert not log.is_archived('gratitude')
+
+
+def test_gratitude_archives_after_ten_misses(log):
+    for i in range(1, 11):
+        log.record('gratitude', f'2026-08-{i:02d}', 'skip')
+    assert log.is_archived('gratitude')
+
+
+def test_threshold_is_per_tradition():
+    from traditions import threshold_for
+    assert threshold_for('gratitude') == 10
+    assert threshold_for('cleaning') == 3
+    assert threshold_for('tarelka') == 3
+
+
+def test_gratitude_warns_before_the_end(log):
+    for i in range(1, 10):
+        log.record('gratitude', f'2026-08-{i:02d}', 'skip')
+    assert 'архив' in warning_line(log, 'gratitude').lower()
+
+
+def test_archived_gratitude_stops_reminding(tmp_path, monkeypatch):
+    import asyncio
+    n = _notifier(tmp_path, monkeypatch)
+    sent = []
+
+    async def fake_send(self, message, send_ss=False, keyboard=None):
+        sent.append(message)
+        return True
+
+    monkeypatch.setattr(type(n), 'send_telegram_message', fake_send)
+    for i in range(1, 11):
+        n.trad_log.record('gratitude', f'2026-08-{i:02d}', 'skip')
+    asyncio.run(n.send_gratitude_reminder())
+    assert sent == []

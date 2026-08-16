@@ -21,8 +21,20 @@ import os
 
 logger = logging.getLogger(__name__)
 
-ARCHIVE_AFTER = 3          # пропусков подряд до архива
+ARCHIVE_AFTER = 3          # пропусков подряд до архива (по умолчанию)
 WARN_AT = 2                # на каком пропуске предупреждать
+
+# Порог считается в пропущенных событиях, а не в днях, поэтому для
+# разного ритма он означает разное время. Три пропуска месячной традиции
+# — квартал, недельной — три недели, а ежедневной — всего три дня: одна
+# командировка убила бы живой ритуал. Ежедневным ритуалам порог выше.
+ARCHIVE_THRESHOLDS = {
+    'gratitude': 10,       # ежедневно: полторы недели полного молчания
+}
+
+
+def threshold_for(key):
+    return ARCHIVE_THRESHOLDS.get(key, ARCHIVE_AFTER)
 
 DONE, SKIP = 'done', 'skip'
 
@@ -89,7 +101,7 @@ class TraditionLog:
         entry['marks'][str(day)] = status
         if status == DONE:
             entry['archived'] = None
-        elif self.misses_in_row(key) >= ARCHIVE_AFTER and not entry['archived']:
+        elif self.misses_in_row(key) >= threshold_for(key) and not entry['archived']:
             entry['archived'] = str(day)
             logger.info("традиция %s ушла в архив", key)
         self._save()
@@ -147,8 +159,10 @@ def event_keyboard(key):
 def warning_line(log, key):
     """Предупреждение на предпоследнем пропуске — чтобы архивация не
     стала неожиданностью."""
-    if log.misses_in_row(key) == WARN_AT and not log.is_archived(key):
-        return ("⚠️ Традицию пропустили дважды подряд. "
+    if (log.misses_in_row(key) == threshold_for(key) - 1
+            and not log.is_archived(key)):
+        n = log.misses_in_row(key)
+        return (f"⚠️ Традицию пропустили {n} раз подряд. "
                 "Ещё раз — и она уйдёт в архив.")
     return ''
 
@@ -156,7 +170,7 @@ def warning_line(log, key):
 def archive_message(key, name):
     """Сообщение об архивации с кнопкой возврата."""
     msg = (f"📦 <b>Традиция ушла в архив</b>\n\n"
-           f"{name} — три пропуска подряд.\n"
+           f"{name} — {threshold_for(key)} пропусков подряд.\n"
            f"Напоминания о ней приходить не будут. Если это ошибка, "
            f"верните её одной кнопкой.")
     kb = {'inline_keyboard': [[

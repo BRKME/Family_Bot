@@ -407,6 +407,20 @@ class FamilyScheduleBot:
                 return (year, month, saturdays[1])
         return None
 
+    def close_past_daily(self, key, days=14):
+        """Закрыть прошедшие дни без ответа для ежедневного ритуала."""
+        from datetime import timedelta as _td
+        today = datetime.now().date()
+        seen = self.trad_log.mark_seen(key, today.isoformat())
+        closed = []
+        for back in range(1, days + 1):
+            day = today - _td(days=back)
+            if day.isoformat() < seen:
+                continue
+            if self.close_unanswered(key, day.isoformat()):
+                closed.append(key)
+        return closed
+
     def close_past_weekly(self, key, weekday, weeks=2):
         """Закрыть прошедшие недельные события без ответа.
 
@@ -516,6 +530,7 @@ class FamilyScheduleBot:
         names['council'] = 'Семейный совет'
         names['cleaning'] = 'Большая уборка'
         names['games'] = 'Семейные игры'
+        names['gratitude'] = 'Семейная благодарность'
         return names
 
     def check_recurring_events(self):
@@ -792,7 +807,20 @@ class FamilyScheduleBot:
         return result
 
     async def send_gratitude_reminder(self):
-        return await self.send_telegram_message("🌷Самое время получить семейную благодарность")
+        """Ежедневно 20:00 МСК — семейная благодарность.
+
+        Порог архива у неё десять пропусков, а не три: ритуал ежедневный,
+        и три подряд набираются на первой же занятой неделе.
+        """
+        if self.trad_log.is_archived('gratitude'):
+            return True
+        self.close_past_daily('gratitude')
+        text = "🌷Самое время получить семейную благодарность"
+        warn = warning_line(self.trad_log, 'gratitude')
+        if warn:
+            text += f"\n\n{warn}"
+        return await self.send_telegram_message(
+            text, keyboard=event_keyboard('gratitude'))
 
     async def send_games_reminder(self):
         """Пятница 19:00 МСК — семейные игры. Такая же традиция: с
