@@ -407,6 +407,25 @@ class FamilyScheduleBot:
                 return (year, month, saturdays[1])
         return None
 
+    def close_past_weekly(self, key, weekday, weeks=2):
+        """Закрыть прошедшие недельные события без ответа.
+
+        Отдельно от close_past_events: уборка, игры и совет живут не в
+        recurring_events, а собственными ветками запуска — у них нет
+        правила вида «вторая суббота месяца», только день недели.
+        """
+        from datetime import timedelta as _td
+        today = datetime.now().date()
+        seen = self.trad_log.mark_seen(key, today.isoformat())
+        closed = []
+        for back in range(1, weeks * 7 + 1):
+            day = today - _td(days=back)
+            if day.isoformat() < seen:
+                continue        # до первого показа механики пропусков нет
+            if day.weekday() == weekday and self.close_unanswered(key, day.isoformat()):
+                closed.append(key)
+        return closed
+
     async def announce_archived(self, keys):
         """Сообщить о заархивированных традициях — с кнопкой возврата.
 
@@ -435,16 +454,22 @@ class FamilyScheduleBot:
         for key, event in self.recurring_events.items():
             if self.trad_log.is_archived(key):
                 continue
+            seen = self.trad_log.mark_seen(key, today.isoformat())
             for back in range(1, 32):
                 day = today - _td(days=back)
+                if day.isoformat() < seen:
+                    continue
                 ed = self.get_event_date_by_rule(event['rule'], day.year, day.month)
                 if ed and _d(*ed) == day:
                     if self.close_unanswered(key, day.isoformat()):
                         closed.append(key)
         # Семейный совет — каждое воскресенье
         if not self.trad_log.is_archived('council'):
+            seen_c = self.trad_log.mark_seen('council', today.isoformat())
             for back in range(1, 15):
                 day = today - _td(days=back)
+                if day.isoformat() < seen_c:
+                    continue
                 if day.weekday() == 6 and self.close_unanswered('council', day.isoformat()):
                     closed.append('council')
         return closed
@@ -489,6 +514,8 @@ class FamilyScheduleBot:
     def tradition_names(self):
         names = {k: v['name'] for k, v in self.recurring_events.items()}
         names['council'] = 'Семейный совет'
+        names['cleaning'] = 'Большая уборка'
+        names['games'] = 'Семейные игры'
         return names
 
     def check_recurring_events(self):
@@ -768,14 +795,34 @@ class FamilyScheduleBot:
         return await self.send_telegram_message("🌷Самое время получить семейную благодарность")
 
     async def send_games_reminder(self):
-        return await self.send_telegram_message("🏠Самое время поиграть в семейные игры и повеселиться")
+        """Пятница 19:00 МСК — семейные игры. Такая же традиция: с
+        кнопками и с архивом по трём пропускам."""
+        if self.trad_log.is_archived('games'):
+            return True
+        self.close_past_weekly('games', 4)      # игры по пятницам
+        return await self.send_telegram_message(
+            "🏠Самое время поиграть в семейные игры и повеселиться",
+            keyboard=event_keyboard('games'))
 
     async def send_cleaning_reminder(self):
         """Воскресенье 10:00 МСК - Большая уборка"""
-        return await self.send_telegram_message("Всем привет сегодня 🧹Большая Уборка!")
+        if self.trad_log.is_archived('cleaning'):
+            return True
+        self.close_past_weekly('cleaning', 6)   # уборка по воскресеньям
+        text = "Всем привет сегодня 🧹Большая Уборка!"
+        warn = warning_line(self.trad_log, 'cleaning')
+        if warn:
+            text += f"\n\n{warn}"
+        return await self.send_telegram_message(
+            text, keyboard=event_keyboard('cleaning'))
 
     async def send_cleaning_tomorrow(self):
-        """Суббота 18:00 МСК - напоминание про уборку завтра"""
+        """Суббота 18:00 МСК - напоминание про уборку завтра.
+
+        Часть той же традиции: если уборка в архиве, предупреждать не о
+        чем."""
+        if self.trad_log.is_archived('cleaning'):
+            return True
         return await self.send_telegram_message("Ребята завтра утром 🧹Большая Уборка!")
 
     async def send_this_day_in_history(self):

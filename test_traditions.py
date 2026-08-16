@@ -308,3 +308,112 @@ def test_nothing_is_announced_without_archiving(tmp_path, monkeypatch):
     monkeypatch.setattr(type(n), 'send_telegram_message', fake_send)
     asyncio.run(n.announce_archived([]))
     assert sent == []
+
+
+# ── Уборка и игры — такие же традиции ────────────────────────────────────
+
+def test_cleaning_is_a_tradition(tmp_path, monkeypatch):
+    """Большая уборка приходила отдельной веткой и в механику не входила:
+    её нельзя было ни отметить, ни заархивировать."""
+    import asyncio
+    n = _notifier(tmp_path, monkeypatch)
+    sent = []
+
+    async def fake_send(self, message, send_ss=False, keyboard=None):
+        sent.append((message, keyboard))
+        return True
+
+    monkeypatch.setattr(type(n), 'send_telegram_message', fake_send)
+    asyncio.run(n.send_cleaning_reminder())
+
+    msg, kb = sent[0]
+    assert 'Уборка' in msg
+    data = [b['callback_data'] for row in kb['inline_keyboard'] for b in row]
+    assert 'trad_done_cleaning' in data and 'trad_skip_cleaning' in data
+
+
+def test_games_are_a_tradition(tmp_path, monkeypatch):
+    import asyncio
+    n = _notifier(tmp_path, monkeypatch)
+    sent = []
+
+    async def fake_send(self, message, send_ss=False, keyboard=None):
+        sent.append(keyboard)
+        return True
+
+    monkeypatch.setattr(type(n), 'send_telegram_message', fake_send)
+    asyncio.run(n.send_games_reminder())
+    data = [b['callback_data'] for row in sent[0]['inline_keyboard'] for b in row]
+    assert 'trad_done_games' in data
+
+
+def test_archived_cleaning_stops_reminding(tmp_path, monkeypatch):
+    import asyncio
+    n = _notifier(tmp_path, monkeypatch)
+    sent = []
+
+    async def fake_send(self, message, send_ss=False, keyboard=None):
+        sent.append(message)
+        return True
+
+    monkeypatch.setattr(type(n), 'send_telegram_message', fake_send)
+    for d in ('2026-08-02', '2026-08-09', '2026-08-16'):
+        n.trad_log.record('cleaning', d, 'skip')
+
+    asyncio.run(n.send_cleaning_reminder())
+    assert sent == [], 'заархивированная уборка всё ещё напоминает'
+
+
+def test_tomorrow_reminder_also_stops(tmp_path, monkeypatch):
+    """Субботнее «завтра уборка» — часть той же традиции."""
+    import asyncio
+    n = _notifier(tmp_path, monkeypatch)
+    sent = []
+
+    async def fake_send(self, message, send_ss=False, keyboard=None):
+        sent.append(message)
+        return True
+
+    monkeypatch.setattr(type(n), 'send_telegram_message', fake_send)
+    for d in ('2026-08-02', '2026-08-09', '2026-08-16'):
+        n.trad_log.record('cleaning', d, 'skip')
+
+    asyncio.run(n.send_cleaning_tomorrow())
+    assert sent == []
+
+
+def test_daily_gratitude_is_not_archivable(tmp_path, monkeypatch):
+    """Ежедневная благодарность — привычка, а не традиция: архивировать
+    её по трём пропускам значило бы убрать её на первой же занятой
+    неделе."""
+    import asyncio
+    n = _notifier(tmp_path, monkeypatch)
+    sent = []
+
+    async def fake_send(self, message, send_ss=False, keyboard=None):
+        sent.append(message)
+        return True
+
+    monkeypatch.setattr(type(n), 'send_telegram_message', fake_send)
+    for d in ('2026-08-14', '2026-08-15', '2026-08-16'):
+        n.trad_log.record('gratitude', d, 'skip')
+
+    asyncio.run(n.send_gratitude_reminder())
+    assert sent, 'благодарность не должна архивироваться'
+
+
+def test_no_backdated_misses_on_first_run(tmp_path, monkeypatch):
+    """Автозакрытие не должно записывать пропуски за дни, когда механики
+    ещё не существовало: иначе на первой же неделе уборка уходит в архив
+    за события, которые бот не показывал."""
+    n = _notifier(tmp_path, monkeypatch)
+    assert n.close_past_weekly('cleaning', 6) == []
+    assert n.trad_log.misses_in_row('cleaning') == 0
+
+
+def test_misses_counted_after_the_tradition_is_seen(tmp_path, monkeypatch):
+    """После первого показа события пропуски считаются как обычно."""
+    n = _notifier(tmp_path, monkeypatch)
+    n.trad_log.mark_seen('cleaning', '2026-08-01')
+    n.trad_log.record('cleaning', '2026-08-02', 'skip')
+    assert n.trad_log.misses_in_row('cleaning') == 1

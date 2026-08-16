@@ -59,7 +59,23 @@ class TraditionLog:
             logger.error("не сохранил traditions.json: %s", e)
 
     def _entry(self, key):
-        return self.data.setdefault(key, {'marks': {}, 'archived': None})
+        return self.data.setdefault(key, {'marks': {}, 'archived': None,
+                                          'seen': None})
+
+    def mark_seen(self, key, day):
+        """Запомнить первый показ традиции с кнопками.
+
+        Всё, что было до этой даты, происходило без механики — записывать
+        туда пропуски нечестно: бот тех событий не показывал.
+        """
+        entry = self._entry(key)
+        if not entry.get('seen'):
+            entry['seen'] = str(day)
+            self._save()
+        return entry['seen']
+
+    def seen_since(self, key):
+        return self.data.get(key, {}).get('seen')
 
     # ── Отметки ──────────────────────────────────────────────────────
 
