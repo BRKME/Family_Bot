@@ -512,3 +512,20 @@ def test_chronos_can_be_archived_by_the_mechanic(tmp_path, monkeypatch):
 def test_chronos_has_a_human_name(tmp_path, monkeypatch):
     n = _notifier(tmp_path, monkeypatch)
     assert 'воспоминаний' in n.tradition_names()['chronos'].lower()
+
+
+def test_morning_message_has_no_parenting_quotes(tmp_path, monkeypatch):
+    """Цитаты были о воспитании и обращены к родителям — в общем чате их
+    читают и дети, для которых это текст о себе в третьем лице."""
+    import asyncio
+    n = _notifier(tmp_path, monkeypatch)
+    sent = []
+
+    async def fake_send(self, message, send_ss=False, keyboard=None):
+        sent.append(message)
+        return True
+
+    monkeypatch.setattr(type(n), 'send_telegram_message', fake_send)
+    asyncio.run(n.send_morning_message())
+    assert '💭' not in sent[0]
+    assert 'пословица' not in sent[0].lower()
