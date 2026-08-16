@@ -599,7 +599,7 @@ class FamilyScheduleBot:
         if dishes_reminder:
             content += f"\nПосуда: {dishes_reminder}\n"
 
-        content += "Телефон Аркаши в 20:00\n"
+        content += "Дети идут спать в 22:00\n"
         
         reminders = self.check_recurring_events()
         if reminders:

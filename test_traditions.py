@@ -593,6 +593,12 @@ def test_message_is_short(tmp_path, monkeypatch):
     assert len([l for l in msg.splitlines() if l.strip()]) <= 10
 
 
+def test_bedtime_line_is_present(tmp_path, monkeypatch):
+    msg = _morning(tmp_path, monkeypatch)
+    assert 'спать в 22:00' in msg
+    assert 'Телефон' not in msg
+
+
 def test_schedule_is_sorted_by_time(tmp_path, monkeypatch):
     """Порядок брался из данных: во вторник Марта в 17:30 оказывалась выше
     Аркаши в 17:00, и смысл «времени слева» терялся."""
