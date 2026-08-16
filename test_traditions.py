@@ -477,3 +477,16 @@ def test_archived_gratitude_stops_reminding(tmp_path, monkeypatch):
         n.trad_log.record('gratitude', f'2026-08-{i:02d}', 'skip')
     asyncio.run(n.send_gratitude_reminder())
     assert sent == []
+
+
+def test_state_is_read_from_the_repo_copy(tmp_path, monkeypatch):
+    """Actions поднимает контейнер с нуля: traditions.json приезжает
+    вместе с чекаутом репозитория. Если файл есть — счётчики должны
+    подхватиться, иначе архив не наступит никогда."""
+    (tmp_path / 'traditions.json').write_text(json.dumps({
+        'cleaning': {'marks': {'2026-08-02': 'skip', '2026-08-09': 'skip'},
+                     'archived': None, 'seen': '2026-08-01'}
+    }), encoding='utf-8')
+    n = _notifier(tmp_path, monkeypatch)
+    n.trad_log = TraditionLog('traditions.json')
+    assert n.trad_log.misses_in_row('cleaning') == 2

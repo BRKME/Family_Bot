@@ -21,6 +21,33 @@
 Состояние — `traditions.json`, логика — `traditions.py`, тесты —
 `test_traditions.py`.
 
+## Где что работает
+
+| Компонент | Где | Что делает |
+|---|---|---|
+| `notifier.py` | GitHub Actions по крону | шлёт сообщения, показывает кнопки |
+| `family_tracker.py` | systemd на VPS | принимает нажатия, пишет `traditions.json`, коммитит его в репозиторий |
+
+Разделение вынужденное: Actions поднимает контейнер с нуля и стирает
+после запуска, поэтому принять нажатие и сохранить состояние он не может.
+
+## Установка трекера на VPS
+
+```bash
+cd /opt && git clone https://github.com/BRKME/Family_Bot.git
+cat > /etc/family-bot.env <<'ENV'
+TELEGRAM_TOKEN=токен_семейного_бота
+TELEGRAM_CHAT_ID=id_семейного_чата
+GITHUB_TOKEN=pat_с_правом_contents
+ENV
+chmod 600 /etc/family-bot.env
+cp /opt/Family_Bot/family-tracker.service /etc/systemd/system/
+systemctl daemon-reload && systemctl enable --now family-tracker
+journalctl -u family-tracker -n 20 --no-pager
+```
+
+Секреты в отдельном файле, а не в юните: `systemctl cat` их не покажет.
+
 ## Запуск
 
 ```bash
