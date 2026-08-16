@@ -24,7 +24,8 @@ from datetime import datetime
 
 import aiohttp
 
-from traditions import TraditionLog, event_keyboard, threshold_for
+from traditions import (TraditionLog, archive_message, event_keyboard,
+                         threshold_for)
 
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(levelname)s - %(message)s')
@@ -71,9 +72,7 @@ class FamilyTracker:
             if action == 'done':
                 note = "Отметил ✅"
             else:
-                left = threshold_for(key) - self.trad_log.misses_in_row(key)
-                note = ("Ок, записал" if left > 1
-                        else "Записал. Ещё раз — и уйдёт в архив")
+                note = self.skip_note(key)
         else:
             return False
 
@@ -82,7 +81,86 @@ class FamilyTracker:
         await self.answer_callback(query_id, note)
         if action != 'restore':
             await self.edit_keyboard(message_id, self.marked_keyboard(key))
+        if action == 'skip':
+            await self.announce_to_chat(key)
         return True
+
+    async def announce_to_chat(self, key):
+        """Пропуск и архив — в общий чат. Выполненную традицию не
+        объявляем: она и так видна по отметке на кнопке, а лишнее
+        сообщение только засоряет переписку."""
+        if self.trad_log.is_archived(key):
+            text, kb = archive_message(key, self.tradition_name(key))
+            await self.send_chat(text, kb)
+        else:
+            await self.send_chat(self.miss_announcement(key))
+
+    async def send_chat(self, text, keyboard=None):
+        url = f"https://api.telegram.org/bot{self.telegram_token}/sendMessage"
+        payload = {'chat_id': self.chat_id, 'text': text, 'parse_mode': 'HTML'}
+        if keyboard:
+            payload['reply_markup'] = json.dumps(keyboard)
+        try:
+            async with self.session.post(url, json=payload, timeout=10) as r:
+                if r.status != 200:
+                    logger.error("сообщение в чат не ушло: %s", r.status)
+        except Exception as e:
+            logger.error("не отправил сообщение в чат: %s", e)
+
+    TRADITION_NAMES = {
+        'council': 'Семейный совет',
+        'cleaning': 'Большая уборка',
+        'games': 'Семейные игры',
+        'gratitude': 'Семейная благодарность',
+        'tarelka': 'Путешествие на тарелке',
+        'new': 'День нового',
+    }
+
+    def tradition_name(self, key):
+        return self.TRADITION_NAMES.get(key, key)
+
+    def miss_announcement(self, key):
+        """Сообщение в чат при пропуске — его видит вся семья.
+
+        Всплывашка достаётся только нажавшему, а традиция — общее дело:
+        остальные должны знать, что она под угрозой, и успеть сказать
+        «давайте всё-таки сделаем».
+
+        Тон нарастает, но остаётся зовущим: сообщение о том, что ещё
+        можно вернуться, работает лучше сообщения о том, что всё плохо.
+        """
+        name = self.tradition_name(key)
+        misses = self.trad_log.misses_in_row(key)
+        left = threshold_for(key) - misses
+        if left == 1:
+            return (f"🔔 <b>{name}</b> — последняя попытка.\n"
+                    f"Пропустили {misses} раза подряд. Сделаем в следующий "
+                    f"раз — и всё вернётся на место.")
+        if left == 2:
+            return (f"👀 <b>{name}</b> — пропуск номер {misses}.\n"
+                    f"Ещё две возможности. Традиция никуда не делась, "
+                    f"её просто давно не звали.")
+        return (f"📌 <b>{name}</b> в этот раз не случилась.\n"
+                f"Бывает. Впереди ещё {left} попытки.")
+
+    def skip_note(self, key):
+        """Текст всплывашки при «Не было».
+
+        Всплывашку видит только нажавший — это разговор с собой, а не
+        публичный укор при всей семье.
+
+        Давить с первого пропуска нельзя: если отвечать станет неприятно,
+        человек просто перестанет нажимать, а молчание тоже засчитается
+        пропуском — и вместо честной картины останется тишина. Поэтому
+        говорим не о вине, а о цене, и только когда архив уже близко.
+        """
+        left = threshold_for(key) - self.trad_log.misses_in_row(key)
+        if left <= 0:
+            return "Традиция ушла в архив 📦 Вернуть можно кнопкой"
+        if left == 1:
+            return ("Осталась одна попытка. Жаль будет потерять традицию — "
+                    "их в семье и так немного")
+        return "Ок, записал"
 
     def marked_keyboard(self, key):
         """Клавиатура с видимой отметкой: без неё непонятно, засчиталось

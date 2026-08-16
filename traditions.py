@@ -167,10 +167,19 @@ def warning_line(log, key):
     return ''
 
 
+def _plural_misses(n):
+    """«3 пропуска», а не «3 пропусков»."""
+    if n % 10 == 1 and n % 100 != 11:
+        return f"{n} пропуск"
+    if n % 10 in (2, 3, 4) and n % 100 not in (12, 13, 14):
+        return f"{n} пропуска"
+    return f"{n} пропусков"
+
+
 def archive_message(key, name):
     """Сообщение об архивации с кнопкой возврата."""
     msg = (f"📦 <b>Традиция ушла в архив</b>\n\n"
-           f"{name} — {threshold_for(key)} пропусков подряд.\n"
+           f"{name} — {_plural_misses(threshold_for(key))} подряд.\n"
            f"Напоминания о ней приходить не будут. Если это ошибка, "
            f"верните её одной кнопкой.")
     kb = {'inline_keyboard': [[

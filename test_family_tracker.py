@@ -195,3 +195,125 @@ def test_every_press_is_logged(tracker, caplog):
     with caplog.at_level(logging.INFO):
         asyncio.run(tracker.handle_callback('trad_skip_cleaning', 'q1', 10))
     assert 'cleaning' in caplog.text
+
+
+# ── Что человек видит во всплывашке ──────────────────────────────────────
+
+def test_first_miss_is_answered_calmly(tracker):
+    """Первый пропуск — обычное дело. Если давить с самого начала,
+    человек перестанет отвечать, и вместо честной картины будет молчание,
+    которое тоже засчитается пропуском."""
+    asyncio.run(tracker.handle_callback('trad_skip_cleaning', 'q1', 10))
+    text = tracker.answered.lower()
+    assert 'жаль' not in text and 'архив' not in text
+
+
+def test_last_chance_says_what_is_being_lost(tracker):
+    """На предпоследнем пропуске говорим не о вине, а о цене."""
+    tracker.trad_log.record('cleaning', '2026-08-02', 'skip')
+    asyncio.run(tracker.handle_callback('trad_skip_cleaning', 'q1', 10))
+    text = tracker.answered.lower()
+    assert 'осталась одна' in text or 'последн' in text
+    assert 'жаль' in text
+
+
+def test_archive_moment_is_announced_in_the_popup(tracker):
+    for d in ('2026-08-02', '2026-08-09'):
+        tracker.trad_log.record('cleaning', d, 'skip')
+    asyncio.run(tracker.handle_callback('trad_skip_cleaning', 'q1', 10))
+    assert 'архив' in tracker.answered.lower()
+
+
+def test_popup_fits_telegram_limit(tracker):
+    """Telegram обрезает всплывашку примерно на 200 символах."""
+    for i in range(3):
+        asyncio.run(tracker.handle_callback('trad_skip_cleaning', f'q{i}', 10))
+        assert len(tracker.answered) <= 200
+
+
+def test_done_never_scolds(tracker):
+    asyncio.run(tracker.handle_callback('trad_done_cleaning', 'q1', 10))
+    assert 'жаль' not in tracker.answered.lower()
+
+
+def test_daily_ritual_warns_late_not_early(tracker):
+    """У благодарности порог десять: на третьем пропуске пугать нечем."""
+    for i in range(1, 3):
+        tracker.trad_log.record('gratitude', f'2026-08-{i:02d}', 'skip')
+    asyncio.run(tracker.handle_callback('trad_skip_gratitude', 'q1', 10))
+    assert 'жаль' not in tracker.answered.lower()
+
+
+# ── Сообщения в чат: их видит вся семья ──────────────────────────────────
+
+def test_chat_message_on_every_miss(tracker, monkeypatch):
+    """Всплывашку видит только нажавший, а традиция — общее дело: семья
+    должна знать, что она под угрозой, чтобы кто-то успел сказать
+    «давайте всё-таки сделаем»."""
+    sent = []
+
+    async def fake_chat(self, text, keyboard=None):
+        sent.append(text)
+
+    monkeypatch.setattr(type(tracker), 'send_chat', fake_chat)
+    asyncio.run(tracker.handle_callback('trad_skip_cleaning', 'q1', 10))
+    assert sent, 'семья не увидела пропуск'
+
+
+def test_tone_grows_but_stays_hopeful(tracker):
+    """С усилением, но без уныния: сообщение должно звать вернуться, а не
+    сообщать, что всё пропало."""
+    texts = []
+    for i, d in enumerate(('2026-08-02', '2026-08-09'), 1):
+        tracker.trad_log.record('cleaning', d, 'skip')
+        texts.append(tracker.miss_announcement('cleaning'))
+    assert texts[0] != texts[1], 'сообщения одинаковые'
+    for t in texts:
+        low = t.lower()
+        assert 'провал' not in low and 'плохо' not in low
+
+
+def test_last_miss_names_what_is_at_stake(tracker):
+    """У порога 3 «последняя попытка» наступает на втором пропуске, а не
+    на первом: после первого их остаётся ещё две."""
+    for d in ('2026-08-02', '2026-08-09'):
+        tracker.trad_log.record('cleaning', d, 'skip')
+    text = tracker.miss_announcement('cleaning')
+    assert 'последн' in text.lower()
+
+
+def test_archive_is_announced_to_everyone(tracker, monkeypatch):
+    sent = []
+
+    async def fake_chat(self, text, keyboard=None):
+        sent.append((text, keyboard))
+
+    monkeypatch.setattr(type(tracker), 'send_chat', fake_chat)
+    for d in ('2026-08-02', '2026-08-09'):
+        tracker.trad_log.record('cleaning', d, 'skip')
+    asyncio.run(tracker.handle_callback('trad_skip_cleaning', 'q1', 10))
+
+    text, kb = sent[-1]
+    assert 'архив' in text.lower()
+    data = [b['callback_data'] for row in kb['inline_keyboard'] for b in row]
+    assert 'trad_restore_cleaning' in data
+
+
+def test_done_sends_nothing_to_the_chat(tracker, monkeypatch):
+    """Выполненная традиция и так видна по отметке на кнопке —
+    поздравлять сообщением значит засорять чат."""
+    sent = []
+
+    async def fake_chat(self, text, keyboard=None):
+        sent.append(text)
+
+    monkeypatch.setattr(type(tracker), 'send_chat', fake_chat)
+    asyncio.run(tracker.handle_callback('trad_done_cleaning', 'q1', 10))
+    assert sent == []
+
+
+def test_tradition_is_named_not_keyed(tracker):
+    """В чат идёт человеческое название, а не ключ из кода."""
+    tracker.trad_log.record('cleaning', '2026-08-02', 'skip')
+    assert 'cleaning' not in tracker.miss_announcement('cleaning')
+    assert 'борка' in tracker.miss_announcement('cleaning')
