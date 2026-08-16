@@ -123,6 +123,7 @@ class FamilyTracker:
         'gratitude': 'Семейная благодарность',
         'tarelka': 'Путешествие на тарелке',
         'new': 'День нового',
+        'chronos': 'Вечер воспоминаний',
     }
 
     def tradition_name(self, key):

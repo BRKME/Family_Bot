@@ -490,3 +490,25 @@ def test_state_is_read_from_the_repo_copy(tmp_path, monkeypatch):
     n = _notifier(tmp_path, monkeypatch)
     n.trad_log = TraditionLog('traditions.json')
     assert n.trad_log.misses_in_row('cleaning') == 2
+
+
+def test_chronos_is_back_in_the_active_list(tmp_path, monkeypatch):
+    """«Вечер воспоминаний» был заархивирован по-старому — закомментирован
+    в коде. Теперь он вернулся и живёт по общим правилам: с кнопками и с
+    авто-архивом, без правки кода."""
+    n = _notifier(tmp_path, monkeypatch)
+    assert 'chronos' in n.recurring_events
+    assert 'chronos' in n.active_events()
+    assert n.recurring_events['chronos']['rule'] == 'third_saturday'
+
+
+def test_chronos_can_be_archived_by_the_mechanic(tmp_path, monkeypatch):
+    n = _notifier(tmp_path, monkeypatch)
+    for d in ('2026-06-20', '2026-07-18', '2026-08-15'):
+        n.trad_log.record('chronos', d, 'skip')
+    assert 'chronos' not in n.active_events()
+
+
+def test_chronos_has_a_human_name(tmp_path, monkeypatch):
+    n = _notifier(tmp_path, monkeypatch)
+    assert 'воспоминаний' in n.tradition_names()['chronos'].lower()
