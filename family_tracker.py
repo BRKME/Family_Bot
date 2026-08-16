@@ -77,6 +77,7 @@ class FamilyTracker:
         else:
             return False
 
+        logger.info("нажатие: %s → %s", key, action)
         await self.sync_to_github()
         await self.answer_callback(query_id, note)
         if action != 'restore':
@@ -167,7 +168,15 @@ class FamilyTracker:
                 payload['sha'] = sha
             async with self.session.put(url, headers=headers, json=payload,
                                         timeout=10) as r:
-                return r.status in (200, 201)
+                if r.status in (200, 201):
+                    logger.info("✅ traditions.json ушёл в репозиторий")
+                    return True
+                # Молчаливый отказ здесь стоил получаса вслепую (16.08):
+                # чтение проходило, а запись возвращала 403 — токен был
+                # выдан только на чтение, и в логе не было ни строки.
+                logger.error("❌ GitHub не принял запись: %s. "
+                             "Проверь право Contents: Read and write", r.status)
+                return False
         except Exception as e:
             logger.error("синк не удался: %s", e)
             return False

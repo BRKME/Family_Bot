@@ -116,3 +116,82 @@ def test_non_callback_updates_are_skipped(tracker):
     asyncio.run(tracker.process_updates(updates))
     assert tracker.offset == 8
     assert tracker.trad_log.data == {}
+
+
+# ── Логи: без них отладка идёт вслепую ───────────────────────────────────
+
+def test_failed_sync_is_logged_with_the_status(tmp_path, monkeypatch, caplog):
+    """Инцидент 16.08: токен не имел прав на запись, GitHub отвечал 403, а
+    в логе не было ни строки — причину искали вручную через curl."""
+    import logging
+    t = FamilyTracker()
+    t.trad_log = TraditionLog(str(tmp_path / 'traditions.json'))
+    t.github_token = 'x'
+
+    class FakeResp:
+        status = 403
+
+        async def json(self):
+            return {}
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+    class FakeSession:
+        def get(self, *a, **kw):
+            return FakeResp()
+
+        def put(self, *a, **kw):
+            return FakeResp()
+
+    t.session = FakeSession()
+    with caplog.at_level(logging.INFO):
+        ok = asyncio.run(t.sync_to_github())
+    assert ok is False
+    assert '403' in caplog.text
+
+
+def test_successful_sync_is_logged(tmp_path, monkeypatch, caplog):
+    """Успех тоже должен быть виден: иначе непонятно, дошло состояние или
+    просто ничего не произошло."""
+    import logging
+    t = FamilyTracker()
+    t.trad_log = TraditionLog(str(tmp_path / 'traditions.json'))
+    t.github_token = 'x'
+
+    class Resp:
+        def __init__(self, status):
+            self.status = status
+
+        async def json(self):
+            return {'sha': 'abc'}
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+    class FakeSession:
+        def get(self, *a, **kw):
+            return Resp(200)
+
+        def put(self, *a, **kw):
+            return Resp(200)
+
+    t.session = FakeSession()
+    with caplog.at_level(logging.INFO):
+        ok = asyncio.run(t.sync_to_github())
+    assert ok is True
+    assert 'traditions.json' in caplog.text
+
+
+def test_every_press_is_logged(tracker, caplog):
+    """По логу должно быть видно, что именно нажали и что записалось."""
+    import logging
+    with caplog.at_level(logging.INFO):
+        asyncio.run(tracker.handle_callback('trad_skip_cleaning', 'q1', 10))
+    assert 'cleaning' in caplog.text
