@@ -152,44 +152,44 @@ class FamilyScheduleBot:
         
         self.kids_schedule = {
             'понедельник': [
-                {'child': '👧 Марта', 'activity': '🇬🇧 Английский', 'time': '16:00-17:00'},
-                {'child': '👦 Аркаша', 'activity': '📐 Математика', 'time': '19:00-20:00'}
+                {'child': 'Марта', 'activity': 'Английский', 'time': '16:00-17:00'},
+                {'child': 'Аркаша', 'activity': 'Математика', 'time': '19:00-20:00'}
             ],
             'вторник': [
-                {'child': '👧 Марта', 'activity': '💃 Танцы', 'time': '17:30-19:00'},
-                {'child': '👦 Аркаша', 'activity': '⚽ Футбол', 'time': '17:00-18:00'}
+                {'child': 'Марта', 'activity': 'Танцы', 'time': '17:30-19:00'},
+                {'child': 'Аркаша', 'activity': 'Футбол', 'time': '17:00-18:00'}
             ],
             'среда': [
-                {'child': '👧 Марта', 'activity': '🤺 Фехтование', 'time': '15:00-16:30'},
-                {'child': '👦 Аркаша', 'activity': '🤺 Фехтование', 'time': '16:00-18:00'},
-                {'child': '👧 Марта', 'activity': '🇬🇧 Английский', 'time': '17:00-18:00'}
+                {'child': 'Марта', 'activity': 'Фехтование', 'time': '15:00-16:30'},
+                {'child': 'Аркаша', 'activity': 'Фехтование', 'time': '16:00-18:00'},
+                {'child': 'Марта', 'activity': 'Английский', 'time': '17:00-18:00'}
             ],
             'четверг': [
-                {'child': '👧 Марта', 'activity': '💃 Танцы', 'time': '17:30-19:00'},
-                {'child': '👦 Аркаша', 'activity': '⚽ Футбол', 'time': '17:00-18:00'}
+                {'child': 'Марта', 'activity': 'Танцы', 'time': '17:30-19:00'},
+                {'child': 'Аркаша', 'activity': 'Футбол', 'time': '17:00-18:00'}
             ],
             'пятница': [
-                {'child': '👧 Марта', 'activity': '🤺 Фехтование', 'time': '15:00-16:30'},
-                {'child': '👦 Аркаша', 'activity': '🤺 Фехтование', 'time': '16:00-18:00'},
-                {'child': '👦 Аркаша', 'activity': '📐 Математика', 'time': '19:00-20:00'}
+                {'child': 'Марта', 'activity': 'Фехтование', 'time': '15:00-16:30'},
+                {'child': 'Аркаша', 'activity': 'Фехтование', 'time': '16:00-18:00'},
+                {'child': 'Аркаша', 'activity': 'Математика', 'time': '19:00-20:00'}
             ],
             'суббота': [
-                {'child': '👧 Марта', 'activity': '🤺 Фехтование', 'time': '15:00-17:00'}
+                {'child': 'Марта', 'activity': 'Фехтование', 'time': '15:00-17:00'}
             ],
             'воскресенье': [
-                {'child': '👧 Марта', 'activity': '🤺 Фехтование', 'time': '12:00-14:00'},
-                {'child': '👦 Аркаша', 'activity': '🤺 Фехтование', 'time': '14:00-16:00'}
+                {'child': 'Марта', 'activity': 'Фехтование', 'time': '12:00-14:00'},
+                {'child': 'Аркаша', 'activity': 'Фехтование', 'time': '14:00-16:00'}
             ]
         }
         
         self.dishes_schedule = {
-            'понедельник': '👧 Марта моет посуду',
-            'вторник': '👦 Аркаша моет посуду',
-            'среда': '👧 Марта моет посуду',
-            'четверг': '👦 Аркаша моет посуду',
-            'пятница': '👧 Марта моет посуду',
-            'суббота': '👨‍👩‍👧‍👦 Аркаша моет посуду',
-            'воскресенье': '👨‍👩‍👧‍👦 Родители моют посуду'
+            'понедельник': 'Марта',
+            'вторник': 'Аркаша',
+            'среда': 'Марта',
+            'четверг': 'Аркаша',
+            'пятница': 'Марта',
+            'суббота': 'Аркаша',
+            'воскресенье': 'Родители'
         }
 
     def get_today_schedule(self):
@@ -526,16 +526,24 @@ class FamilyScheduleBot:
         
         logger.info(f"✅ Найдено {len(activities)} занятий для {day_ru}")
         
-        schedule_text = "<b>👨‍👩‍👧‍👦 Занятия детей сегодня:</b>\n"
+        schedule_text = ""
         successful_items = 0
         
+        # По времени, а не по порядку в данных: иначе занятие в 17:30
+        # оказывается выше того, что в 17:00, и «время слева» перестаёт
+        # работать.
+        activities = sorted(activities, key=lambda a: a.get('time', ''))
+
         for idx, item in enumerate(activities):
             try:
                 child = item['child']
                 activity = item['activity']
                 time = item['time']
                 
-                schedule_text += f"• {child} — {activity} <i>({time})</i>\n"
+                # Время слева: единственное, что выхватывается глазом
+                # утром. Эмодзи убраны — метка на сообщение одна.
+                start = time.split('-')[0].strip()
+                schedule_text += f"{start} {child} — {activity}\n"
                 successful_items += 1
                 logger.debug(f"  ✓ Занятие {idx+1}: {child} - {activity} ({time})")
                 
@@ -572,28 +580,26 @@ class FamilyScheduleBot:
         }
         day_ru = day_names.get(day_of_week, day_of_week)
         
-        content = f"🌅 <b>Доброе Утро ! Сегодня «{day_ru}» {date_str}</b>\n\n"
-        
+        # Компактная шапка (16.08.2026). Раньше до первой полезной строки
+        # шло семь: погода в три строки, курсы, цитата. Утром нужно одно —
+        # во сколько везти детей, поэтому расписание идёт сразу за датой,
+        # а погода ужата в строку. Курсы убраны: они личные, и в личном
+        # боте уже есть.
+        content = f"🌅 <b>{day_ru}, {date_str}</b>\n"
+
         weather = await self.get_weather_forecast()
         if weather:
-            content += weather
-        
-        # Добавляем курсы валют после погоды
-        currency = await self.get_currency_rates()
-        if currency:
-            content += currency
-        
-        
+            content += f"{weather}\n"
+
         kids_schedule_text = self.get_kids_schedule(day_of_week)
         if kids_schedule_text:
-            content += f"{kids_schedule_text}\n"
-        
+            content += f"\n<b>Сегодня:</b>\n{kids_schedule_text}"
+
         dishes_reminder = self.get_dishes_reminder(day_of_week)
         if dishes_reminder:
-            content += f"<b>🍽️ Посуда:</b>\n• {dishes_reminder}\n\n"
-        
-        # Напоминание про телефон
-        content += "<b>📱 Телефон:</b>\n• 👀 Аркаша сдает телефон в 20:00\n\n"
+            content += f"\nПосуда: {dishes_reminder}\n"
+
+        content += "Телефон Аркаши в 20:00\n"
         
         reminders = self.check_recurring_events()
         if reminders:

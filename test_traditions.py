@@ -529,3 +529,74 @@ def test_morning_message_has_no_parenting_quotes(tmp_path, monkeypatch):
     asyncio.run(n.send_morning_message())
     assert '💭' not in sent[0]
     assert 'пословица' not in sent[0].lower()
+
+
+# ── Компактное утреннее сообщение ────────────────────────────────────────
+
+def _morning(tmp_path, monkeypatch):
+    import asyncio
+    n = _notifier(tmp_path, monkeypatch)
+    sent = []
+
+    async def fake_send(self, message, send_ss=False, keyboard=None):
+        sent.append(message)
+        return True
+
+    async def fake_weather(self):
+        return "20°C, облачно"
+
+    monkeypatch.setattr(type(n), 'send_telegram_message', fake_send)
+    monkeypatch.setattr(type(n), 'get_weather_forecast', fake_weather)
+    asyncio.run(n.send_morning_message())
+    return sent[0]
+
+
+def test_weather_is_one_line_right_after_the_date(tmp_path, monkeypatch):
+    """Раньше шапка занимала семь строк — погода, ветер, курс, цитата, —
+    и главное начиналось в середине сообщения."""
+    lines = [l for l in _morning(tmp_path, monkeypatch).splitlines() if l.strip()]
+    assert 'облачно' in lines[1]
+    assert 'Ветер' not in lines[1]
+
+
+def test_no_currency_rates(tmp_path, monkeypatch):
+    """Курс BTC в семейном чате не нужен: он личный, и в личном боте есть."""
+    msg = _morning(tmp_path, monkeypatch)
+    assert 'BTC' not in msg and 'USD' not in msg
+
+
+def test_kids_schedule_leads_with_time(tmp_path, monkeypatch):
+    """Время слева выхватывается глазом мгновенно — это единственное, что
+    реально нужно утром."""
+    msg = _morning(tmp_path, monkeypatch)
+    assert 'Сегодня:' in msg
+    lines = [l for l in msg.splitlines() if 'Марта' in l]
+    assert lines and lines[0].strip().startswith('12:00')
+
+
+def test_dishes_are_a_single_short_line(tmp_path, monkeypatch):
+    msg = _morning(tmp_path, monkeypatch)
+    assert 'Посуда: ' in msg
+    assert '🍽️' not in msg
+
+
+def test_emoji_only_in_the_header(tmp_path, monkeypatch):
+    """Одна метка на сообщение: когда помечено всё, не помечено ничего."""
+    msg = _morning(tmp_path, monkeypatch)
+    body = msg.split('\n', 1)[1]
+    for e in ('👨‍👩‍👧‍👦', '🍽️', '📱', '👧', '👦', '💭'):
+        assert e not in body, e
+
+
+def test_message_is_short(tmp_path, monkeypatch):
+    msg = _morning(tmp_path, monkeypatch)
+    assert len([l for l in msg.splitlines() if l.strip()]) <= 10
+
+
+def test_schedule_is_sorted_by_time(tmp_path, monkeypatch):
+    """Порядок брался из данных: во вторник Марта в 17:30 оказывалась выше
+    Аркаши в 17:00, и смысл «времени слева» терялся."""
+    n = _notifier(tmp_path, monkeypatch)
+    text = n.get_kids_schedule('tuesday')
+    times = [l.split()[0] for l in text.splitlines() if l.strip()]
+    assert times == sorted(times)
