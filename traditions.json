@@ -24,7 +24,8 @@
   },
   "games": {
     "marks": {
-      "2026-08-23": "done"
+      "2026-08-23": "done",
+      "2026-08-29": "skip"
     },
     "archived": null,
     "seen": null
