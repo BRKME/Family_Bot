@@ -37,5 +37,12 @@
     },
     "archived": null,
     "seen": null
+  },
+  "cleaning": {
+    "marks": {
+      "2026-08-30": "done"
+    },
+    "archived": null,
+    "seen": null
   }
 }
