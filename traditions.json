@@ -48,5 +48,12 @@
     },
     "archived": null,
     "seen": null
+  },
+  "new": {
+    "marks": {
+      "2026-09-12": "skip"
+    },
+    "archived": null,
+    "seen": null
   }
 }
