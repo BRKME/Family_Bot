@@ -567,11 +567,16 @@ def test_no_currency_rates(tmp_path, monkeypatch):
 
 def test_kids_schedule_leads_with_time(tmp_path, monkeypatch):
     """Время слева выхватывается глазом мгновенно — это единственное, что
-    реально нужно утром."""
-    msg = _morning(tmp_path, monkeypatch)
-    assert 'Сегодня:' in msg
-    lines = [l for l in msg.splitlines() if 'Марта' in l]
-    assert lines and lines[0].strip().startswith('12:00')
+    реально нужно утром. Проверяем на конкретном дне, а не на сегодняшнем:
+    состав занятий у разных дней разный, и тест не должен зависеть от
+    того, когда его запустили."""
+    import re
+    n = _notifier(tmp_path, monkeypatch)
+    text = n.get_kids_schedule('monday')
+    lines = [l for l in text.splitlines() if l.strip()]
+    assert lines
+    for line in lines:
+        assert re.match(r'^\d{2}:\d{2} ', line), line
 
 
 def test_dishes_are_a_single_short_line(tmp_path, monkeypatch):
@@ -606,3 +611,56 @@ def test_schedule_is_sorted_by_time(tmp_path, monkeypatch):
     text = n.get_kids_schedule('tuesday')
     times = [l.split()[0] for l in text.splitlines() if l.strip()]
     assert times == sorted(times)
+
+
+# ── Расписание детей, обновление 15.09.2026 ──────────────────────────────
+
+def test_schedule_matches_the_new_plan(tmp_path, monkeypatch):
+    n = _notifier(tmp_path, monkeypatch)
+    s = n.kids_schedule
+
+    def has(day, child, activity, start):
+        return any(i['child'] == child and i['activity'] == activity
+                   and i['time'].startswith(start) for i in s[day])
+
+    assert has('понедельник', 'Марта', 'Фехтование', '15:00')
+    assert has('понедельник', 'Аркаша', 'Фехтование', '16:15')
+    assert has('понедельник', 'Марта', 'Английский', '18:00')
+
+    assert len(s['вторник']) == 1
+    assert has('вторник', 'Аркаша', 'Футбол', '17:00')
+
+    assert has('среда', 'Марта', 'Английский', '17:00')
+    assert has('среда', 'Аркаша', 'Математика', '19:00')
+
+    assert has('четверг', 'Марта', 'Шахматы', '14:40')
+    assert has('четверг', 'Аркаша', 'Футбол', '17:00')
+
+    assert has('пятница', 'Аркаша', 'Математика', '19:00')
+
+    assert has('суббота', 'Марта', 'Шахматы', '13:50')
+    assert has('суббота', 'Аркаша', 'Фехтование', '16:15')
+
+    assert has('воскресенье', 'Марта', 'Фехтование', '10:30')
+    assert has('воскресенье', 'Аркаша', 'Фехтование', '12:00')
+
+
+def test_dances_are_gone():
+    """Танцы во вторник и четверг заменены футболом и шахматами."""
+    import os
+    os.environ.setdefault('TELEGRAM_TOKEN', 'test-token')
+    from notifier import FamilyScheduleBot
+    s = FamilyScheduleBot().kids_schedule
+    assert not any(i['activity'] == 'Танцы'
+                   for day in s.values() for i in day)
+
+
+def test_sunday_swimming_is_flexible(tmp_path, monkeypatch):
+    """Плавание в воскресенье — время плавающее, четыре варианта на
+    выбор. Жёсткое время здесь врало бы."""
+    n = _notifier(tmp_path, monkeypatch)
+    swim = [i for i in n.kids_schedule['воскресенье']
+            if i['activity'].startswith('Плавание')]
+    assert swim, 'плавание пропало'
+    assert '13:30' in swim[0]['time']
+    assert '19:30' in swim[0]['activity']       # остальные варианты рядом
