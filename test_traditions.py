@@ -594,7 +594,12 @@ def test_emoji_only_in_the_header(tmp_path, monkeypatch):
 
 
 def test_message_is_short(tmp_path, monkeypatch):
+    """Компактность базовой части. Напоминания о традициях приходят не
+    каждый день и добавляют свои блоки — считать их вместе с шапкой
+    значит получать падение в любой день с напоминанием."""
     msg = _morning(tmp_path, monkeypatch)
+    for marker in ('🔔', '🎉', '📋 Семейный совет'):
+        msg = msg.split(marker, 1)[0]
     assert len([l for l in msg.splitlines() if l.strip()]) <= 10
 
 
