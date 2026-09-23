@@ -2,20 +2,29 @@ name: Family Schedule Bot
 
 on:
   schedule:
-    - cron: '30 3 * * *'   # Утро 7:30 MSK
+    # Утренний запуск уехал на VPS-крон (22.09.2026): расписание GitHub
+    # дрейфует на часы, сообщение приходило не вовремя. Здесь остались
+    # только те, где дрейф не критичен.
     - cron: '0 17 * * *'   # Вечер 20:00 MSK - благодарность
     - cron: '0 16 * * 5'   # Пятница 19:00 MSK - игры
     - cron: '0 7 * * 0'    # Воскресенье 10:00 MSK - Большая Уборка
     - cron: '0 15 * * 6'   # Суббота 18:00 MSK - напоминание про уборку завтра
     - cron: '0 14 * * *'   # Ежедневно 17:00 MSK - случайное напоминание
   workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Что отправить'
+        required: false
+        default: 'morning'
+        type: choice
+        options: [morning, gratitude, games, cleaning, cleaning_tomorrow, this_day]
 
 jobs:
   send-morning-notification:
     runs-on: ubuntu-latest
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-    if: github.event.schedule == '30 3 * * *' || github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' && inputs.mode == 'morning'
     
     steps:
       - name: Checkout code
@@ -46,7 +55,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-    if: github.event.schedule == '0 17 * * *'
+    if: github.event.schedule == '0 17 * * *' || (github.event_name == 'workflow_dispatch' && inputs.mode == 'gratitude')
     
     steps:
       - name: Checkout code
@@ -71,7 +80,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-    if: github.event.schedule == '0 16 * * 5'
+    if: github.event.schedule == '0 16 * * 5' || (github.event_name == 'workflow_dispatch' && inputs.mode == 'games')
     
     steps:
       - name: Checkout code
@@ -96,7 +105,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-    if: github.event.schedule == '0 7 * * 0'
+    if: github.event.schedule == '0 7 * * 0' || (github.event_name == 'workflow_dispatch' && inputs.mode == 'cleaning')
     
     steps:
       - name: Checkout code
@@ -121,7 +130,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-    if: github.event.schedule == '0 15 * * 6'
+    if: github.event.schedule == '0 15 * * 6' || (github.event_name == 'workflow_dispatch' && inputs.mode == 'cleaning_tomorrow')
     
     steps:
       - name: Checkout code
@@ -146,7 +155,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-    if: github.event.schedule == '0 14 * * *'
+    if: github.event.schedule == '0 14 * * *' || (github.event_name == 'workflow_dispatch' && inputs.mode == 'this_day')
     
     steps:
       - name: Checkout code
