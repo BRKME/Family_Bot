@@ -7,7 +7,7 @@
       "2026-09-13": "done"
     },
     "archived": null,
-    "seen": "2026-09-23"
+    "seen": null
   },
   "gratitude": {
     "marks": {
@@ -42,13 +42,14 @@
       "2026-08-29": "skip"
     },
     "archived": null,
-    "seen": "2026-09-23"
+    "seen": null
   },
   "cleaning": {
     "marks": {
       "2026-08-30": "done",
       "2026-09-13": "done",
-      "2026-09-20": "done"
+      "2026-09-20": "done",
+      "2026-09-27": "done"
     },
     "archived": null,
     "seen": null
@@ -58,13 +59,13 @@
       "2026-09-12": "skip"
     },
     "archived": null,
-    "seen": "2026-09-23"
+    "seen": null
   },
   "chronos": {
     "marks": {
       "2026-09-19": "skip"
     },
     "archived": null,
-    "seen": "2026-09-23"
+    "seen": null
   }
 }
