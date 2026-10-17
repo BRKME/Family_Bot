@@ -68,7 +68,8 @@
   },
   "chronos": {
     "marks": {
-      "2026-09-19": "skip"
+      "2026-09-19": "skip",
+      "2026-10-17": "skip"
     },
     "archived": null,
     "seen": null
